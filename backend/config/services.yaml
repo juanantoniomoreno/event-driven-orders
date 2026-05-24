@@ -1,0 +1,15 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    App\:
+        resource: "../src/"
+        exclude:
+            - "../src/Domain/Entity/"
+
+    App\Controller\:
+        resource: "../src/Controller/"
+        public: true
+        tags: ["controller.service_arguments"]

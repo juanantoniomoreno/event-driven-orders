@@ -1,0 +1,11 @@
+framework:
+  secret: "%env(APP_SECRET)%"
+  http_method_override: false
+  handle_all_throwables: true
+  messenger:
+    transports:
+      async: "%env(MESSENGER_TRANSPORT_DSN)%"
+    routing:
+      App\Messaging\Message\OrderCreatedMessage: async
+  php_errors:
+    log: true

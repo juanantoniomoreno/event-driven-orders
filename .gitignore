@@ -1,0 +1,15 @@
+# Local Pi runtime state
+.atl/
+.pi/
+frontend/.pi-lens/
+
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+
+# Symfony runtime
+backend/var/cache/
+backend/var/log/
+backend/var/*.db
+.env.local
+.env.*.local
