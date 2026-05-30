@@ -4,14 +4,19 @@ framework:
         # failure_transport: failed
 
         transports:
-            # https://symfony.com/doc/current/messenger.html#transport-configuration
-            async: '%env(MESSENGER_TRANSPORT_DSN)%'
+            # Phase 2: 3 specialized queues in Redis Streams
+            async_notifications: "%env(MESSENGER_TRANSPORT_DSN_NOTIFICATIONS)%"
+            async_inventory: "%env(MESSENGER_TRANSPORT_DSN_INVENTORY)%"
+            async_analytics: "%env(MESSENGER_TRANSPORT_DSN_ANALYTICS)%"
             # failed: 'doctrine://default?queue_name=failed'
-            sync: 'sync://'
+            sync: "sync://"
 
         routing:
-            # Route your messages to the transports
-            'App\Message\YourMessage': async
+            # Phase 2: one message → 3 queues (fan-out)
+            'App\Messaging\Message\OrderCreatedMessage':
+                - async_notifications
+                - async_inventory
+                - async_analytics
 
 # when@test:
 #    framework:
