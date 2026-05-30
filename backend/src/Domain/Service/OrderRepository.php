@@ -6,7 +6,7 @@ namespace App\Domain\Service;
 
 use App\Domain\Entity\Order;
 
-class OrderRepository
+class OrderRepository implements OrderRepositoryInterface
 {
     private \PDO $pdo;
 

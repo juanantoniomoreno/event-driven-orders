@@ -3,21 +3,24 @@
     "type": "project",
     "require": {
         "php": ">=8.2",
-        "symfony/framework-bundle": "^7.0",
-        "symfony/runtime": "^7.0",
+        "doctrine/doctrine-bundle": "^3.2",
+        "doctrine/doctrine-migrations-bundle": "^4.0",
+        "doctrine/orm": "^3.6",
         "symfony/console": "^7.0",
         "symfony/dotenv": "^7.0",
-        "symfony/yaml": "^7.0",
-        "symfony/messenger": "^7.0",
-        "symfony/redis-messenger": "^7.0",
-        "symfony/serializer": "^7.0",
-        "symfony/property-access": "^7.0",
+        "symfony/flex": "^2.0",
+        "symfony/framework-bundle": "^7.0",
         "symfony/http-foundation": "^7.0",
         "symfony/http-kernel": "^7.0",
-        "symfony/routing": "^7.0",
-        "symfony/flex": "^2.0",
+        "symfony/mercure-bundle": "^0.4",
+        "symfony/messenger": "^7.0",
         "symfony/monolog-bundle": "^3.8",
-        "symfony/mercure-bundle": "^0.4"
+        "symfony/property-access": "^7.0",
+        "symfony/redis-messenger": "^7.0",
+        "symfony/routing": "^7.0",
+        "symfony/runtime": "^7.0",
+        "symfony/serializer": "^7.0",
+        "symfony/yaml": "^7.0"
     },
     "config": {
         "optimize-autoloader": true,
@@ -40,5 +43,8 @@
         "post-install-cmd": [
             "@auto-scripts"
         ]
+    },
+    "require-dev": {
+        "symfony/maker-bundle": "^1.67"
     }
 }

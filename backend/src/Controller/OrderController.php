@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Domain\Service\CreateOrderService;
-use App\Domain\Service\OrderRepository;
+use App\Domain\Service\OrderRepositoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,7 +14,7 @@ class OrderController
 {
     public function __construct(
         private CreateOrderService $createService,
-        private OrderRepository $repository
+        private OrderRepositoryInterface $repository
     ) {}
 
     public function create(Request $request): JsonResponse

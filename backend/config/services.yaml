@@ -2,14 +2,18 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
-        public: false
 
     App\:
         resource: "../src/"
         exclude:
+            - "../src/DependencyInjection/"
             - "../src/Domain/Entity/"
+            - "../src/Kernel.php"
 
     App\Controller\:
         resource: "../src/Controller/"
         public: true
         tags: ["controller.service_arguments"]
+
+    # Bind OrderRepositoryInterface to Doctrine implementation
+    App\Domain\Service\OrderRepositoryInterface: '@App\Domain\Service\DoctrineOrderRepository'

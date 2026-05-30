@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Messaging\Handler;
 
-use App\Domain\Service\OrderRepository;
+use App\Domain\Service\OrderRepositoryInterface;
 use App\Messaging\Message\OrderCreatedMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mercure\HubInterface;
@@ -16,7 +16,7 @@ class SendOrderConfirmationHandler
 {
     public function __construct(
         private LoggerInterface $logger,
-        private OrderRepository $orderRepository,
+        private OrderRepositoryInterface $orderRepository,
         private HubInterface $hub
     ) {}
 

@@ -1,4 +1,22 @@
 services:
+  # Phase 4: PostgreSQL for persistent storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: edo_postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD: orders
+      POSTGRES_DB: orders
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     container_name: edo_redis
@@ -25,6 +43,8 @@ services:
         condition: service_healthy
       mercure:
         condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - APP_ENV=dev
       # Phase 2: PHP needs all 3 DSNs because it dispatches to all 3 transports
@@ -34,6 +54,8 @@ services:
       # Phase 3: Mercure configuration
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      # Phase 4: Database URL for Doctrine/PostgreSQL
+      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
 
   nginx:
     image: nginx:alpine
@@ -81,11 +103,14 @@ services:
         condition: service_healthy
       mercure:
         condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=redis://redis:6379/notifications
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   worker_inventory:
@@ -103,11 +128,14 @@ services:
         condition: service_healthy
       mercure:
         condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_INVENTORY=redis://redis:6379/inventory
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   worker_analytics:
@@ -125,11 +153,14 @@ services:
         condition: service_healthy
       mercure:
         condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_ANALYTICS=redis://redis:6379/analytics
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   frontend:
@@ -145,3 +176,4 @@ services:
 
 volumes:
   redis_data:
+  postgres_data:
