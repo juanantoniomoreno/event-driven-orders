@@ -12,11 +12,12 @@ Layered architecture with domain separation:
 src/
 ├── Controller/        # HTTP layer — thin, delegates to services
 ├── Domain/
-│   ├── Entity/        # Order entity
-│   └── Service/       # Business logic + repository
+│   ├── Entity/        # Doctrine entities (Order)
+│   └── Service/       # Business logic + repository interface/implementations
 ├── Messaging/
 │   ├── Message/       # Immutable message DTOs for Messenger
-│   └── Handler/       # Async processors
+│   └── Handler/       # Async processors (one per transport)
+├── DataFixtures/      # Test data loading
 └── Kernel.php
 ```
 
@@ -27,28 +28,20 @@ src/
 - **Namespace**: `App\` maps to `src/`
 - **Routing**: YAML-based (`config/routes.yaml`), not annotations/attributes
 - **DI config**: `config/services.yaml` — autowire + autoconfigure enabled
+- **Repository binding**: `OrderRepositoryInterface` → `DoctrineOrderRepository` (configured in services.yaml)
 
 ## Key Patterns
 
 - **Service layer**: Controllers never touch repositories directly; they call service classes (e.g., `CreateOrderService`)
-- **Repository**: Concrete `OrderRepository` class with SQLite/PDO (no interface abstraction)
-- **Async messaging**: Single `OrderCreatedMessage` dispatched to `async` transport
-- **SQLite persistence**: Database file stored in `var/orders.db`, auto-created on first use
+- **Repository interface**: Domain defines the interface, infrastructure provides the implementation
+- **Fan-out messaging**: One `OrderCreatedMessage` dispatches to 3 transports simultaneously
+- **Mercure integration**: Handlers publish real-time updates after processing
 
 ## Database
 
-SQLite with PDO. Schema auto-created in `OrderRepository::init()`:
+PostgreSQL 16 with Doctrine ORM. Entity mapping via PHP 8 attributes in `Order.php`.
 
-```sql
-CREATE TABLE orders (
-    id TEXT PRIMARY KEY,
-    customer_email TEXT NOT NULL,
-    items TEXT NOT NULL,        -- JSON array
-    total REAL NOT NULL,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
-```
+Migration file: `backend/migrations/Version20250530000000.php`
 
 ## Commands
 
@@ -56,8 +49,16 @@ CREATE TABLE orders (
 # Run locally (without Docker)
 php -S localhost:8000 -t public
 
-# Consume messages
-php bin/console messenger:consume async -vv
+# Doctrine migrations
+php bin/console doctrine:migrations:migrate
+
+# Load fixtures
+php bin/console doctrine:fixtures:load
+
+# Consume messages (one per terminal)
+php bin/console messenger:consume async_notifications -vv
+php bin/console messenger:consume async_inventory -vv
+php bin/console messenger:consume async_analytics -vv
 
 # Clear cache
 php bin/console cache:clear
@@ -65,10 +66,9 @@ php bin/console cache:clear
 
 ## Known Technical Debt
 
-- **No repository interface**: `OrderRepository` is concrete, no abstraction for testing
 - **No validation**: No Symfony Validator usage — input validation is missing
 - **No DTOs**: Controllers work with raw `json_decode` arrays
 - **No error handling**: No custom exception handling or API error format
 - **No tests**: No `tests/` directory exists
 - **Float for money**: `float $total` causes precision issues
-- **SQLite in production**: Not suitable for concurrent writes or high load
+- **SQLite backup**: `OrderRepository` (SQLite) kept but unused — consider removing
