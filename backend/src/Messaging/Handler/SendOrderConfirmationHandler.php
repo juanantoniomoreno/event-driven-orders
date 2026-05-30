@@ -7,6 +7,8 @@ namespace App\Messaging\Handler;
 use App\Domain\Service\OrderRepository;
 use App\Messaging\Message\OrderCreatedMessage;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mercure\HubInterface;
+use Symfony\Component\Mercure\Update;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler(fromTransport: 'async_notifications')]
@@ -14,7 +16,8 @@ class SendOrderConfirmationHandler
 {
     public function __construct(
         private LoggerInterface $logger,
-        private OrderRepository $orderRepository
+        private OrderRepository $orderRepository,
+        private HubInterface $hub
     ) {}
 
     public function __invoke(OrderCreatedMessage $message): void
@@ -38,6 +41,20 @@ class SendOrderConfirmationHandler
             $order->markAsProcessed();
             $this->orderRepository->save($order);
             $this->logger->info('[NOTIFICATIONS] Order status updated to processed', [
+                'orderId' => $message->getOrderId(),
+            ]);
+
+            // Publish status update to Mercure
+            $update = new Update(
+                topics: "/orders/{$order->getId()}/status",
+                data: json_encode([
+                    'orderId' => $order->getId(),
+                    'status' => $order->getStatus(),
+                    'processedBy' => 'notifications',
+                ])
+            );
+            $this->hub->publish($update);
+            $this->logger->info('[NOTIFICATIONS] Published status update to Mercure', [
                 'orderId' => $message->getOrderId(),
             ]);
         }

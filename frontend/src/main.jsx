@@ -17,8 +17,25 @@ function App() {
 
 	useEffect(() => {
 		fetchOrders();
-		const id = setInterval(fetchOrders, 2000);
-		return () => clearInterval(id);
+
+		// Subscribe to real-time order status updates via Mercure
+		const mercureUrl = "http://localhost:3001/.well-known/mercure";
+		const topic = "/orders/*/status";
+		const eventSource = new EventSource(
+			`${mercureUrl}?topic=${encodeURIComponent(topic)}`,
+		);
+
+		eventSource.onmessage = (event) => {
+			const data = JSON.parse(event.data);
+			// Update only the order that changed
+			setOrders((prev) =>
+				prev.map((order) =>
+					order.id === data.orderId ? { ...order, status: data.status } : order,
+				),
+			);
+		};
+
+		return () => eventSource.close();
 	}, []);
 
 	const createOrder = async (e) => {
