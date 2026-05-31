@@ -22,8 +22,8 @@ services:
     image: rabbitmq:4-management
     container_name: edo_rabbitmq
     ports:
-      - "5673:5672"    # AMQP
-      - "15673:15672"  # Management UI
+      - "5673:5672" # AMQP
+      - "15673:15672" # Management UI
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -88,6 +88,8 @@ services:
       # Directives in Caddyfile format: each on its own line
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins *
+        publish_origins *
+        anonymous
         publish
         subscribe
     restart: unless-stopped
