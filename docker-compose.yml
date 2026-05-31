@@ -19,7 +19,7 @@ services:
 
   # Phase 5: RabbitMQ (AMQP) replaces Redis for message queuing
   rabbitmq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4-management
     container_name: edo_rabbitmq
     ports:
       - "5673:5672"    # AMQP
@@ -27,8 +27,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      RABBITMQ_ERLANG_COOKIE: dev-cookie-event-driven-orders
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -42,7 +41,6 @@ services:
     container_name: edo_php
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     command: ["php-fpm"]
     depends_on:
@@ -104,7 +102,6 @@ services:
       ["php", "bin/console", "messenger:consume", "async_notifications", "-vv"]
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
       rabbitmq:
@@ -130,7 +127,6 @@ services:
       ["php", "bin/console", "messenger:consume", "async_inventory", "-vv"]
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
       rabbitmq:
@@ -156,7 +152,6 @@ services:
       ["php", "bin/console", "messenger:consume", "async_analytics", "-vv"]
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
       rabbitmq:
@@ -185,5 +180,4 @@ services:
       - mercure
 
 volumes:
-  rabbitmq_data:
   postgres_data:
