@@ -57,7 +57,7 @@ services:
       - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
       - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
       # Phase 3: Mercure configuration
-      - MERCURE_URL=http://mercure:3001/.well-known/mercure
+      - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       # Phase 4: Database URL for Doctrine/PostgreSQL
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
@@ -115,7 +115,7 @@ services:
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
-      - MERCURE_URL=http://mercure:3001/.well-known/mercure
+      - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
@@ -140,7 +140,7 @@ services:
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
-      - MERCURE_URL=http://mercure:3001/.well-known/mercure
+      - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
@@ -165,7 +165,7 @@ services:
     environment:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
-      - MERCURE_URL=http://mercure:3001/.well-known/mercure
+      - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
