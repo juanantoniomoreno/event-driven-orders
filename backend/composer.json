@@ -16,7 +16,7 @@
         "symfony/messenger": "^7.0",
         "symfony/monolog-bundle": "^3.8",
         "symfony/property-access": "^7.0",
-        "symfony/redis-messenger": "^7.0",
+        "symfony/amqp-messenger": "^7.0",
         "symfony/routing": "^7.0",
         "symfony/runtime": "^7.0",
         "symfony/serializer": "^7.0",

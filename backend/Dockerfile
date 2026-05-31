@@ -7,12 +7,14 @@ RUN apk add --no-cache \
     bash \
     netcat-openbsd \
     libpq \
+    rabbitmq-c \
+    rabbitmq-c-dev \
     $PHPIZE_DEPS \
     postgresql-dev \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
+    && pecl install amqp \
+    && docker-php-ext-enable amqp \
     && docker-php-ext-install pdo pdo_pgsql opcache \
-    && apk del $PHPIZE_DEPS postgresql-dev
+    && apk del $PHPIZE_DEPS postgresql-dev rabbitmq-c-dev
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 

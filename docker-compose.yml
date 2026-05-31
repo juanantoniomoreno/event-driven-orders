@@ -17,17 +17,22 @@ services:
       timeout: 3s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: edo_redis
+  # Phase 5: RabbitMQ (AMQP) replaces Redis for message queuing
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: edo_rabbitmq
     ports:
-      - "6380:6379"
+      - "5673:5672"    # AMQP
+      - "15673:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
-      - redis_data:/data
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   php:
@@ -41,7 +46,7 @@ services:
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     command: ["php-fpm"]
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
       mercure:
         condition: service_started
@@ -49,10 +54,10 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      # Phase 2: PHP needs all 3 DSNs because it dispatches to all 3 transports
-      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=redis://redis:6379/notifications
-      - MESSENGER_TRANSPORT_DSN_INVENTORY=redis://redis:6379/inventory
-      - MESSENGER_TRANSPORT_DSN_ANALYTICS=redis://redis:6379/analytics
+      # Phase 5: AMQP DSNs for RabbitMQ
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
       # Phase 3: Mercure configuration
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
@@ -102,7 +107,7 @@ services:
       - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
       mercure:
         condition: service_started
@@ -110,7 +115,7 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=redis://redis:6379/notifications
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
@@ -128,7 +133,7 @@ services:
       - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
       mercure:
         condition: service_started
@@ -136,7 +141,7 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_INVENTORY=redis://redis:6379/inventory
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
@@ -154,7 +159,7 @@ services:
       - /var/www/html/vendor
     entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
       mercure:
         condition: service_started
@@ -162,7 +167,7 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_ANALYTICS=redis://redis:6379/analytics
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
       - MERCURE_URL=http://mercure:3001/.well-known/mercure
       - MERCURE_JWT_SECRET=development_secret_key_change_in_production
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
@@ -180,5 +185,5 @@ services:
       - mercure
 
 volumes:
-  redis_data:
+  rabbitmq_data:
   postgres_data:

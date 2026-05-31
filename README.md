@@ -6,9 +6,11 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 
 | Capa         | Tecnología                    |
 | ------------ | ----------------------------- |
-| Backend      | Symfony 7 + Messenger (Redis) |
+| Backend      | Symfony 7 + Messenger         |
 | Frontend     | React 18 + Vite (mínimo)      |
 | Cola         | Redis Streams                 |
+| Base de datos| PostgreSQL 16 + Doctrine ORM  |
+| Tiempo real  | Mercure Hub (SSE)             |
 | Contenedores | Docker + Docker Compose       |
 | CI/CD        | GitHub Actions                |
 
@@ -18,36 +20,37 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 ├── backend/
 │   ├── src/
 │   │   ├── Controller/          # HTTP API (REST)
-│   │   ├── Domain/
-│   │   │   ├── Entity/          # Order (modelo de dominio)
-│   │   │   └── Service/         # Lógica de negocio + repositorio
-│   │   └── Messaging/
-│   │       ├── Message/         # OrderCreatedMessage (para Messenger)
-│   │       └── Handler/         # Procesadores async
-│   ├── config/                  # Symfony config
+│   │   ├── Entity/              # Order (Doctrine ORM)
+│   │   ├── Repository/          # OrderRepository (Doctrine)
+│   │   ├── Service/             # CreateOrderService
+│   │   └── MessageHandler/      # 3 handlers especializados
+│   ├── config/                  # Symfony + Messenger + Doctrine
+│   ├── migrations/              # Doctrine migrations
 │   ├── public/                  # Entry point
-│   ├── Dockerfile               # PHP-FPM + Redis extension
+│   ├── docker-entrypoint.sh     # Auto-migraciones al iniciar
+│   ├── Dockerfile               # PHP-FPM + pgsql + redis
 │   └── nginx.conf               # Reverse proxy
 ├── frontend/
 │   ├── src/
-│   │   └── main.jsx             # App React mínima
+│   │   └── main.jsx             # App React con SSE
 │   ├── Dockerfile               # Multi-stage (build + nginx)
-│   └── nginx.conf               # Proxy a API
-├── docker-compose.yml           # Redis + PHP + Nginx + Worker + Frontend
+│   └── nginx.conf               # Proxy a API + Mercure
+├── docker-compose.yml           # 8 servicios (nginx, php, postgres, redis, mercure, 3 workers, frontend)
 └── .github/workflows/
     ├── ci.yml                   # Build, lint, test en PR/push
-    └── cd.yml                   # Deploy automático a VPS
+    └── cd.yml                   # Deploy automático a VPS (⚠️ desactualizado)
 ```
 
-## Flujo de eventos (Fase 1)
+## Flujo de eventos (arquitectura actual)
 
 1. Cliente hace `POST /api/orders`
-2. Symfony crea la orden y **dispacha** `OrderCreatedMessage`
-3. Messenger la serializa y la **encola en Redis**
-4. El **worker** (`messenger:consume async`) la recoge y ejecuta el handler
-5. El handler simula procesamiento (sleep + log)
+2. Symfony crea la orden en PostgreSQL y **dispacha** `OrderCreatedMessage`
+3. Messenger serializa y **fan-out** a 3 colas Redis (`async_notifications`, `async_inventory`, `async_analytics`)
+4. Cada **worker** especializado consume su cola y ejecuta su handler
+5. Cada handler publica el nuevo estado al **Mercure Hub** (tópico `orders/{id}`)
+6. El **frontend** recibe la actualización en tiempo real por SSE
 
-Esto es programación orientada a eventos: el controlador no sabe quién va a procesar la orden, solo dice "pasó esto".
+Esto es programación orientada a eventos: el controlador no sabe quién va a procesar la orden, solo dice "pasó esto". Los workers son independientes y escalables.
 
 ## Cómo levantarlo
 
@@ -68,10 +71,14 @@ docker compose up -d --build
 # 4. Verificar servicios
 # API:        http://localhost:8080/api/orders
 # Frontend:   http://localhost:3000
+# Mercure:    http://localhost:3001/.well-known/mercure
 # Redis:      docker exec edo_redis redis-cli ping
+# PostgreSQL: docker exec edo_postgres psql -U app -d orders
 
-# 5. Ver logs del worker (procesamiento async)
-docker logs -f edo_worker
+# 5. Ver logs de los workers
+docker logs -f edo_worker_notifications
+docker logs -f edo_worker_inventory
+docker logs -f edo_worker_analytics
 ```
 
 ## API
@@ -94,23 +101,27 @@ curl -X POST http://localhost:8080/api/orders \
 
 ### ✅ Fase 1: Eventos de dominio con Messenger + Redis
 
-Lo que ya está armado. Eventos async con worker separado.
+Eventos async con worker separado usando Redis Streams.
 
-### ⬜ Fase 2: Múltiples workers especializados
+### ✅ Fase 2: Múltiples workers especializados
 
-Separar handlers en distintos consumers:
+Tres workers independientes, cada uno con su propia cola en Redis:
 
-- `notifications` (email)
-- `inventory` (stock)
-- `analytics` (métricas)
+- `worker_notifications` → envía confirmación por email
+- `worker_inventory` → actualiza stock
+- `worker_analytics` → registra métricas
 
-### ⬜ Fase 3: Tiempo real
+El message bus hace fan-out: un solo `OrderCreatedMessage` se enruta a las 3 colas.
 
-Agregar Mercure o SSE para notificar al frontend cuando una orden cambia de estado.
+### ✅ Fase 3: Tiempo real con Mercure
 
-### ⬜ Fase 4: Persistencia real
+Mercure Hub notifica al frontend por SSE cuando una orden cambia de estado.
+Cada handler publica updates al tópico `orders/{id}` después de procesar.
 
-Reemplazar el repositorio en memoria por Doctrine + PostgreSQL.
+### ✅ Fase 4: Persistencia con PostgreSQL + Doctrine
+
+Reemplazo de SQLite por PostgreSQL 16 con Doctrine ORM.
+Entidad `Order` mapeada, migraciones automáticas al levantar los contenedores.
 
 ### ⬜ Fase 5: RabbitMQ
 
@@ -126,7 +137,7 @@ Migrar el transport de Redis a RabbitMQ para aprender AMQP.
 
 - HTTPS con Let's Encrypt
 - Secrets en GitHub
-- Docker Swarm o AWS ECS
+- Variables de entorno seguras (JWT de Mercure hardcodeado actualmente)
 
 ## CI/CD
 
