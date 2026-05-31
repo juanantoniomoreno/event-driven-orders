@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 const API = "/api";
+const MERCURE_URL = "http://localhost:3001/.well-known/mercure";
 
 function App() {
 	const [orders, setOrders] = useState([]);
 	const [email, setEmail] = useState("");
 	const [items, setItems] = useState("");
 	const [total, setTotal] = useState("");
+	const eventSourcesRef = useRef({});
 
 	const fetchOrders = async () => {
 		const res = await fetch(`${API}/orders`);
@@ -15,32 +17,59 @@ function App() {
 		setOrders(data);
 	};
 
-	useEffect(() => {
-		fetchOrders();
+	// Subscribe to Mercure SSE for a specific order
+	const subscribeToOrder = (orderId) => {
+		// Avoid duplicate subscriptions
+		if (eventSourcesRef.current[orderId]) return;
 
-		// Subscribe to real-time order status updates via Mercure
-		const mercureUrl = "http://localhost:3001/.well-known/mercure";
-		const topic = "/orders/*/status";
-		const eventSource = new EventSource(
-			`${mercureUrl}?topic=${encodeURIComponent(topic)}`,
+		const topic = `/orders/${orderId}/status`;
+		const es = new EventSource(
+			`${MERCURE_URL}?topic=${encodeURIComponent(topic)}`,
 		);
 
-		eventSource.onmessage = (event) => {
+		es.onmessage = (event) => {
 			const data = JSON.parse(event.data);
-			// Update only the order that changed
 			setOrders((prev) =>
 				prev.map((order) =>
-					order.id === data.orderId ? { ...order, status: data.status } : order,
+					order.id === data.orderId
+						? { ...order, status: data.status }
+						: order,
 				),
 			);
+			// Clean up subscription once the order is updated
+			es.close();
+			delete eventSourcesRef.current[orderId];
 		};
 
-		return () => eventSource.close();
+		es.onerror = () => {
+			es.close();
+			delete eventSourcesRef.current[orderId];
+		};
+
+		eventSourcesRef.current[orderId] = es;
+	};
+
+	// Subscribe to existing orders on mount
+	useEffect(() => {
+		fetchOrders();
+		return () => {
+			// Cleanup all event sources
+			Object.values(eventSourcesRef.current).forEach((es) => es.close());
+		};
 	}, []);
+
+	// Subscribe to new orders when they're added to the list
+	useEffect(() => {
+		orders.forEach((order) => {
+			if (order.status === "pending") {
+				subscribeToOrder(order.id);
+			}
+		});
+	}, [orders]);
 
 	const createOrder = async (e) => {
 		e.preventDefault();
-		await fetch(`${API}/orders`, {
+		const res = await fetch(`${API}/orders`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -49,10 +78,13 @@ function App() {
 				total: parseFloat(total),
 			}),
 		});
+		const newOrder = await res.json();
 		setEmail("");
 		setItems("");
 		setTotal("");
-		fetchOrders();
+		// Add the new order and subscribe to its SSE updates
+		setOrders((prev) => [...prev, newOrder]);
+		subscribeToOrder(newOrder.id);
 	};
 
 	return (
