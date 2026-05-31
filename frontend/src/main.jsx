@@ -31,9 +31,7 @@ function App() {
 			const data = JSON.parse(event.data);
 			setOrders((prev) =>
 				prev.map((order) =>
-					order.id === data.orderId
-						? { ...order, status: data.status }
-						: order,
+					order.id === data.orderId ? { ...order, status: data.status } : order,
 				),
 			);
 			// Clean up subscription once the order is updated
@@ -82,8 +80,8 @@ function App() {
 		setEmail("");
 		setItems("");
 		setTotal("");
-		// Add the new order and subscribe to its SSE updates
-		setOrders((prev) => [...prev, newOrder]);
+		// Add the new order at the TOP (newest first) and subscribe to SSE
+		setOrders((prev) => [newOrder, ...prev]);
 		subscribeToOrder(newOrder.id);
 	};
 
