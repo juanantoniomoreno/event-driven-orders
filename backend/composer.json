@@ -45,6 +45,11 @@
         ]
     },
     "require-dev": {
+        "dama/doctrine-test-bundle": "^8.6",
+        "phpunit/phpunit": "^13.1",
+        "symfony/browser-kit": "^8.1",
+        "symfony/clock": "^8.1",
+        "symfony/css-selector": "^8.1",
         "symfony/maker-bundle": "^1.67"
     }
 }
