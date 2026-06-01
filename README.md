@@ -8,7 +8,7 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 | ------------ | ----------------------------- |
 | Backend      | Symfony 7 + Messenger         |
 | Frontend     | React 18 + Vite (mínimo)      |
-| Cola         | Redis Streams                 |
+| Cola         | RabbitMQ (AMQP)               |
 | Base de datos| PostgreSQL 16 + Doctrine ORM  |
 | Tiempo real  | Mercure Hub (SSE)             |
 | Contenedores | Docker + Docker Compose       |
@@ -28,14 +28,14 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 │   ├── migrations/              # Doctrine migrations
 │   ├── public/                  # Entry point
 │   ├── docker-entrypoint.sh     # Auto-migraciones al iniciar
-│   ├── Dockerfile               # PHP-FPM + pgsql + redis
+│   ├── Dockerfile               # PHP-FPM + pgsql + amqp
 │   └── nginx.conf               # Reverse proxy
 ├── frontend/
 │   ├── src/
 │   │   └── main.jsx             # App React con SSE
 │   ├── Dockerfile               # Multi-stage (build + nginx)
 │   └── nginx.conf               # Proxy a API + Mercure
-├── docker-compose.yml           # 8 servicios (nginx, php, postgres, redis, mercure, 3 workers, frontend)
+├── docker-compose.yml           # 8 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
 └── .github/workflows/
     ├── ci.yml                   # Build, lint, test en PR/push
     └── cd.yml                   # Deploy automático a VPS (⚠️ desactualizado)
@@ -45,7 +45,7 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 
 1. Cliente hace `POST /api/orders`
 2. Symfony crea la orden en PostgreSQL y **dispacha** `OrderCreatedMessage`
-3. Messenger serializa y **fan-out** a 3 colas Redis (`async_notifications`, `async_inventory`, `async_analytics`)
+3. Messenger serializa y **fan-out** a 3 colas RabbitMQ (`async_notifications`, `async_inventory`, `async_analytics`)
 4. Cada **worker** especializado consume su cola y ejecuta su handler
 5. Cada handler publica el nuevo estado al **Mercure Hub** (tópico `orders/{id}`)
 6. El **frontend** recibe la actualización en tiempo real por SSE
@@ -72,7 +72,7 @@ docker compose up -d --build
 # API:        http://localhost:8080/api/orders
 # Frontend:   http://localhost:3000
 # Mercure:    http://localhost:3001/.well-known/mercure
-# Redis:      docker exec edo_redis redis-cli ping
+# RabbitMQ:   http://localhost:15672 (guest/guest)
 # PostgreSQL: docker exec edo_postgres psql -U app -d orders
 
 # 5. Ver logs de los workers
@@ -123,9 +123,9 @@ Cada handler publica updates al tópico `orders/{id}` después de procesar.
 Reemplazo de SQLite por PostgreSQL 16 con Doctrine ORM.
 Entidad `Order` mapeada, migraciones automáticas al levantar los contenedores.
 
-### ⬜ Fase 5: RabbitMQ
+### ✅ Fase 5: RabbitMQ
 
-Migrar el transport de Redis a RabbitMQ para aprender AMQP.
+Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas AMQP con rabbitmq:4-management.
 
 ### ⬜ Fase 6: Testing
 
