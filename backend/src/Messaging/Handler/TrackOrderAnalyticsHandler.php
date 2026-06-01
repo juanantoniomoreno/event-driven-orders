@@ -7,6 +7,7 @@ namespace App\Messaging\Handler;
 use App\Domain\Service\OrderRepositoryInterface;
 use App\Messaging\Message\OrderCreatedMessage;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -29,7 +30,7 @@ class TrackOrderAnalyticsHandler
         ]);
 
         // Simulate saving metrics to external service (Mixpanel, Datadog, etc.)
-        sleep(1);
+        Clock::sleep(1);
 
         $this->logger->info('[ANALYTICS] Metrics recorded', [
             'orderId' => $message->getOrderId(),

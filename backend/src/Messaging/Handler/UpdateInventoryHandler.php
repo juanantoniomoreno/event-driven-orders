@@ -7,6 +7,7 @@ namespace App\Messaging\Handler;
 use App\Domain\Service\OrderRepositoryInterface;
 use App\Messaging\Message\OrderCreatedMessage;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -28,7 +29,7 @@ class UpdateInventoryHandler
         ]);
 
         // Simulate updating stock in database
-        sleep(1);
+        Clock::sleep(1);
 
         $this->logger->info('[INVENTORY] Stock updated', [
             'orderId' => $message->getOrderId(),
