@@ -58,7 +58,7 @@ services:
       - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
       # Phase 3: Mercure configuration
       - MERCURE_URL=http://mercure/.well-known/mercure
-      - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
       # Phase 4: Database URL for Doctrine/PostgreSQL
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
 
@@ -83,8 +83,8 @@ services:
       SERVER_NAME: ":80"
       # JWT keys for authenticating publications and subscriptions
       # In dev we use the same key, in prod they should be different
-      MERCURE_PUBLISHER_JWT_KEY: "development_secret_key_change_in_production"
-      MERCURE_SUBSCRIBER_JWT_KEY: "development_secret_key_change_in_production"
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
       # Directives in Caddyfile format: each on its own line
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins *
@@ -116,7 +116,7 @@ services:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
       - MERCURE_URL=http://mercure/.well-known/mercure
-      - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
@@ -141,7 +141,7 @@ services:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
       - MERCURE_URL=http://mercure/.well-known/mercure
-      - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
@@ -166,7 +166,7 @@ services:
       - APP_ENV=dev
       - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
       - MERCURE_URL=http://mercure/.well-known/mercure
-      - MERCURE_JWT_SECRET=development_secret_key_change_in_production
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
       - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
     restart: unless-stopped
 
