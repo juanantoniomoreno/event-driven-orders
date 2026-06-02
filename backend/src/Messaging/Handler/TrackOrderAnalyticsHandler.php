@@ -30,7 +30,8 @@ class TrackOrderAnalyticsHandler
         ]);
 
         // Simulate saving metrics to external service (Mixpanel, Datadog, etc.)
-        Clock::sleep(1);
+        $clock = new Clock();
+        $clock->sleep(1);
 
         $this->logger->info('[ANALYTICS] Metrics recorded', [
             'orderId' => $message->getOrderId(),

@@ -17,4 +17,5 @@ if ($_SERVER['APP_DEBUG']) {
 
 // Ensure test environment
 $_SERVER['APP_ENV'] = 'test';
+$_ENV['APP_ENV'] = 'test';
 $_SERVER['APP_DEBUG'] = $_SERVER['APP_DEBUG'] ?? '0';

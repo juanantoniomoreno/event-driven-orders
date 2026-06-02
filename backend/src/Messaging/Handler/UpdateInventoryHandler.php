@@ -29,7 +29,8 @@ class UpdateInventoryHandler
         ]);
 
         // Simulate updating stock in database
-        Clock::sleep(1);
+        $clock = new Clock();
+        $clock->sleep(1);
 
         $this->logger->info('[INVENTORY] Stock updated', [
             'orderId' => $message->getOrderId(),

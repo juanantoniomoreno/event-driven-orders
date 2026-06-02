@@ -30,7 +30,8 @@ class SendOrderConfirmationHandler
         ]);
 
         // Simulate sending email (SMTP, SendGrid, etc.)
-        Clock::sleep(2);
+        $clock = new Clock();
+        $clock->sleep(2);
 
         $this->logger->info('[NOTIFICATIONS] Confirmation email sent', [
             'orderId' => $message->getOrderId(),
