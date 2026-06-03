@@ -127,17 +127,20 @@ Entidad `Order` mapeada, migraciones automáticas al levantar los contenedores.
 
 Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas AMQP con rabbitmq:4-management.
 
-### ⬜ Fase 6: Testing
+### ✅ Fase 6: Testing
 
-- Unit tests con PHPUnit
-- Integration tests para handlers
-- E2E con Playwright
+- ✅ Unit tests: Order, OrderCreatedMessage, CreateOrderService (14 tests, 58 assertions)
+- ✅ Integration tests: repositorio + handlers con SQLite in-memory (8 tests, 25 assertions)
+- ✅ Functional tests: OrderController HTTP end-to-end (6 tests)
+- ⬜ E2E con Playwright
 
-### ⬜ Fase 7: Producción
+### 🔄 Fase 7: Producción (en progreso)
 
-- HTTPS con Let's Encrypt
-- Secrets en GitHub
-- Variables de entorno seguras (JWT de Mercure hardcodeado actualmente)
+- ✅ 7.1 — Centralizar secreto JWT de Mercure (`.env` raíz, sin hardcodeo)
+- 🔲 7.2 — Hardening de Mercure (quitar anonymous, JWT por endpoint, CORS restringido)
+- 🔲 7.3 — Security headers en Nginx
+- 🔲 7.4 — HTTPS con certificado self-signed
+- 🔲 7.5 — Higiene de variables de entorno
 
 ## CI/CD
 

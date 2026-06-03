@@ -87,9 +87,8 @@ services:
       MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
       # Directives in Caddyfile format: each on its own line
       MERCURE_EXTRA_DIRECTIVES: |
-        cors_origins *
+        cors_origins http://localhost:3000
         publish_origins *
-        anonymous
         publish
         subscribe
     restart: unless-stopped

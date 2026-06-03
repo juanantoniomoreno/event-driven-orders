@@ -1,14 +1,19 @@
 api_orders_create:
-  path: /api/orders
-  methods: [POST]
-  controller: App\Controller\OrderController::create
+    path: /api/orders
+    methods: [POST]
+    controller: App\Controller\OrderController::create
 
 api_orders_list:
-  path: /api/orders
-  methods: [GET]
-  controller: App\Controller\OrderController::list
+    path: /api/orders
+    methods: [GET]
+    controller: App\Controller\OrderController::list
 
 api_orders_get:
-  path: /api/orders/{id}
-  methods: [GET]
-  controller: App\Controller\OrderController::get
+    path: /api/orders/{id}
+    methods: [GET]
+    controller: App\Controller\OrderController::get
+
+api_mercure_jwt:
+    path: /api/mercure/jwt
+    methods: [GET]
+    controller: App\Controller\MercureJwtController::token

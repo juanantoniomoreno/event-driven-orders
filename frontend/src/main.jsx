@@ -18,33 +18,43 @@ function App() {
 	};
 
 	// Subscribe to Mercure SSE for a specific order
-	const subscribeToOrder = (orderId) => {
+	const subscribeToOrder = async (orderId) => {
 		// Avoid duplicate subscriptions
 		if (eventSourcesRef.current[orderId]) return;
 
-		const topic = `/orders/${orderId}/status`;
-		const es = new EventSource(
-			`${MERCURE_URL}?topic=${encodeURIComponent(topic)}`,
-		);
+		try {
+			// Get a subscriber JWT from the backend
+			const jwtRes = await fetch(`${API}/mercure/jwt`);
+			const { token } = await jwtRes.json();
 
-		es.onmessage = (event) => {
-			const data = JSON.parse(event.data);
-			setOrders((prev) =>
-				prev.map((order) =>
-					order.id === data.orderId ? { ...order, status: data.status } : order,
-				),
+			const topic = `/orders/${orderId}/status`;
+			const es = new EventSource(
+				`${MERCURE_URL}?topic=${encodeURIComponent(topic)}&authorization=${encodeURIComponent(token)}`,
 			);
-			// Clean up subscription once the order is updated
-			es.close();
-			delete eventSourcesRef.current[orderId];
-		};
 
-		es.onerror = () => {
-			es.close();
-			delete eventSourcesRef.current[orderId];
-		};
+			es.onmessage = (event) => {
+				const data = JSON.parse(event.data);
+				setOrders((prev) =>
+					prev.map((order) =>
+						order.id === data.orderId
+							? { ...order, status: data.status }
+							: order,
+					),
+				);
+				// Clean up subscription once the order is updated
+				es.close();
+				delete eventSourcesRef.current[orderId];
+			};
 
-		eventSourcesRef.current[orderId] = es;
+			es.onerror = () => {
+				es.close();
+				delete eventSourcesRef.current[orderId];
+			};
+
+			eventSourcesRef.current[orderId] = es;
+		} catch (err) {
+			console.error("Failed to get Mercure JWT:", err);
+		}
 	};
 
 	// Subscribe to existing orders on mount

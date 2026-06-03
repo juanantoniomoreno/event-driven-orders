@@ -17,3 +17,6 @@ services:
 
     # Bind OrderRepositoryInterface to Doctrine implementation
     App\Domain\Service\OrderRepositoryInterface: '@App\Domain\Service\DoctrineOrderRepository'
+
+    # Bind Mercure TokenFactoryInterface for subscriber JWT generation
+    Symfony\Component\Mercure\Jwt\TokenFactoryInterface: "@mercure.hub.default.jwt.factory"
