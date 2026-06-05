@@ -137,8 +137,8 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 ### 🔄 Fase 7: Producción (en progreso)
 
 - ✅ 7.1 — Centralizar secreto JWT de Mercure (`.env` raíz, sin hardcodeo)
-- 🔲 7.2 — Hardening de Mercure (quitar anonymous, JWT por endpoint, CORS restringido)
-- 🔲 7.3 — Security headers en Nginx
+- ✅ 7.2 — Hardening de Mercure (quitar anonymous, JWT por endpoint, CORS restringido)
+- ✅ 7.3 — Security headers en Nginx (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, CSP)
 - 🔲 7.4 — HTTPS con certificado self-signed
 - 🔲 7.5 — Higiene de variables de entorno
 

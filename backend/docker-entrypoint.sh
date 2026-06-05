@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# Ensure var/ is writable by www-data (volume mount overlays host permissions)
+chmod -R 777 var/ 2>/dev/null || true
+
 # Only run migrations for the main php-fpm container, not workers
 if [ "$1" = "php-fpm" ]; then
     echo "[entrypoint] Waiting for PostgreSQL..."
