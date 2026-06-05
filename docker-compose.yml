@@ -6,13 +6,13 @@ services:
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_USER: orders
-      POSTGRES_PASSWORD: orders
-      POSTGRES_DB: orders
+      POSTGRES_USER: ${POSTGRES_USER:-orders}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orders}
+      POSTGRES_DB: ${POSTGRES_DB:-orders}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orders"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orders}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -25,8 +25,8 @@ services:
       - "5673:5672" # AMQP
       - "15673:15672" # Management UI
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
       RABBITMQ_ERLANG_COOKIE: dev-cookie-event-driven-orders
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
@@ -53,14 +53,14 @@ services:
     environment:
       - APP_ENV=dev
       # Phase 5: AMQP DSNs for RabbitMQ
-      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
-      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
-      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_notifications
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_inventory
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_analytics
       # Phase 3: Mercure configuration
       - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
       # Phase 4: Database URL for Doctrine/PostgreSQL
-      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
 
   nginx:
     image: nginx:alpine
@@ -115,10 +115,10 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://guest:guest@rabbitmq:5672/%2f/async_notifications
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_notifications
       - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
-      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   worker_inventory:
@@ -140,10 +140,10 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://guest:guest@rabbitmq:5672/%2f/async_inventory
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_inventory
       - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
-      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   worker_analytics:
@@ -165,10 +165,10 @@ services:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://guest:guest@rabbitmq:5672/%2f/async_analytics
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_analytics
       - MERCURE_URL=http://mercure/.well-known/mercure
       - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
-      - DATABASE_URL=postgresql://orders:orders@postgres:5432/orders?serverVersion=16&charset=utf8
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   frontend:

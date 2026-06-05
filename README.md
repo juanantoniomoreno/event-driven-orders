@@ -52,6 +52,28 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 
 Esto es programación orientada a eventos: el controlador no sabe quién va a procesar la orden, solo dice "pasó esto". Los workers son independientes y escalables.
 
+## Configuración (variables de entorno)
+
+Las variables de entorno se cargan desde dos lugares:
+
+- **`.env`** en la raíz del proyecto — leído por Docker Compose. Contiene credenciales de backing services (RabbitMQ, PostgreSQL) y el secreto JWT de Mercure.
+- **`backend/.env`** — leído por Symfony. Contiene solo variables de Symfony (`APP_ENV`, `APP_SECRET`, `MERCURE_URL`, etc.).
+
+Ambos archivos están en `.gitignore`. El repo incluye **`.env.example`** como plantilla pública con valores placeholder. En un entorno nuevo:
+
+```bash
+# 1. Copiar la plantilla y editar con valores reales
+cp .env.example .env
+# Generar un secreto JWT de 64 chars (256 bits mínimo, 512 bits recomendado):
+openssl rand -hex 32
+# Pegar el resultado en MERCURE_JWT_SECRET dentro de .env
+
+# 2. Para Symfony, los valores dev de `backend/.env` son suficientes
+# Si necesitás overrides locales, usá `backend/.env.local` (no se commitea)
+```
+
+> En producción, las credenciales deben venir de un secrets manager (Docker Secrets, Vault, AWS Secrets Manager), nunca del `.env` commiteado.
+
 ## Cómo levantarlo
 
 ```bash
@@ -69,11 +91,12 @@ cd ..
 docker compose up -d --build
 
 # 4. Verificar servicios
-# API:        http://localhost:8080/api/orders
-# Frontend:   http://localhost:3000
-# Mercure:    http://localhost:3001/.well-known/mercure
-# RabbitMQ:   http://localhost:15672 (guest/guest)
-# PostgreSQL: docker exec edo_postgres psql -U app -d orders
+# API (HTTP):  http://localhost:8080/api/orders  (redirige a HTTPS)
+# API (HTTPS): https://localhost:8443/api/orders  (cert self-signed)
+# Frontend:    http://localhost:3000
+# Mercure:     http://localhost:3001/.well-known/mercure
+# RabbitMQ:    http://localhost:15673 (guest/guest)
+# PostgreSQL:  docker exec edo_postgres psql -U orders -d orders
 
 # 5. Ver logs de los workers
 docker logs -f edo_worker_notifications
