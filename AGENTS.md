@@ -74,8 +74,7 @@ docker compose up -d --build
 
 ## Known Technical Debt
 
-- **Race condition / no idempotency**: All 3 handlers call `markAsProcessed()` independently without checking if the order was already processed for that handler. If a message is retried, side effects (email, inventory, analytics) get duplicated (planned as Phase 8.1)
-- **Handler code duplication**: The 3 handlers share ~80% identical structure (load order, sleep, markAsProcessed, publish to Mercure). Refactor candidate for Phase 8.2 — **must be done after 8.1** so the idempotency check can be factored into the shared abstraction
+- **Lost update on concurrent handler saves**: The `processedBy` JSON column can lose data when multiple handlers save concurrently (last write wins). Each handler's individual idempotency still works on retry, but `processedBy` won't reliably reflect all handlers that ran. Fix: optimistic locking on the Order entity, or a separate `order_handler_status` table.
 
 ## Resolved
 
@@ -83,3 +82,5 @@ docker compose up -d --build
 - ~~Mercure JWT hardcoded~~ → Phase 7.1 (centralized in root `.env`, referenced via `${MERCURE_JWT_SECRET}`)
 - ~~No HTTPS~~ → Phase 7.4 (self-signed cert in `certs/`, nginx on :8443)
 - ~~CD workflow outdated~~ → Phase 7.6 (rewritten for 3 workers + RabbitMQ, with `.env` check, `--remove-orphans`, and worker log verification)
+- ~~Race condition / no idempotency~~ → Phase 8.1 (Order.`processedBy` JSON column, each handler checks `isProcessedBy()` before doing work, retries are silently skipped)
+- ~~Handler code duplication~~ → Phase 8.2 (extracted Template Method into `AbstractOrderHandler`; each handler is now ~30 lines implementing 4 hooks)

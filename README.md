@@ -166,6 +166,11 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 - ✅ 7.5 — Higiene de variables de entorno (`.env.example` template, parametrización en `docker-compose.yml`)
 - ✅ 7.6 — CD workflow alineado con la arquitectura real (3 workers + RabbitMQ)
 
+### ✅ Fase 8: Deuda técnica
+
+- ✅ 8.1 — Idempotencia en handlers (columna `processed_by` JSON en Order, cada handler registra su paso, retries se saltan)
+- ✅ 8.2 — Refactor DRY de handlers (Template Method: `AbstractOrderHandler`, 4 hooks por handler, ~30 líneas cada uno)
+
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker.

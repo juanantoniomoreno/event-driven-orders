@@ -75,6 +75,45 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
 
         $this->assertNotNull($updated, 'Order should still exist in the DB');
         $this->assertSame('processed', $updated->getStatus(), 'Handler should have called markAsProcessed');
+        $this->assertSame(['notifications'], $updated->getProcessedBy(), 'Handler should have recorded itself in processedBy');
+    }
+
+    public function testHandlerSkipsWhenAlreadyProcessed(): void
+    {
+        // ARRANGE: create an order already processed by notifications
+        $order = Order::reconstruct(
+            id: 'skipNotif000001',
+            customerEmail: 'already@example.com',
+            items: ['widget'],
+            total: 9.99,
+            status: 'processed',
+            createdAt: new \DateTimeImmutable(),
+            processedBy: ['notifications'],
+        );
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        // Mercure should NOT be called — handler should skip
+        $this->hub->expects($this->never())->method('publish');
+        // But idempotency skip should be logged
+        $this->logger->expects($this->any())->method('info');
+
+        $message = new OrderCreatedMessage('skipNotif000001', 'already@example.com', 9.99, ['widget']);
+
+        // ACT
+        $this->handler->__invoke($message);
+
+        // ASSERT: processedBy should still be exactly what it was (no duplicate)
+        $this->entityManager->clear();
+        $updated = $this->repository->find('skipNotif000001');
+
+        $this->assertNotNull($updated);
+        $this->assertSame(
+            ['notifications'],
+            $updated->getProcessedBy(),
+            'processedBy should not have changed — handler should have skipped'
+        );
     }
 
     public function testHandlerDoesNothingWhenOrderNotFound(): void

@@ -26,6 +26,9 @@ class Order
     #[ORM\Column(type: 'string', length: 20)]
     private string $status;
 
+    #[ORM\Column(type: 'json', options: ['default' => '[]'])]
+    private array $processedBy = [];
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -39,6 +42,7 @@ class Order
         $this->items = $items;
         $this->total = $total;
         $this->status = 'pending';
+        $this->processedBy = [];
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -48,12 +52,14 @@ class Order
         array $items,
         float $total,
         string $status,
-        \DateTimeImmutable $createdAt
+        \DateTimeImmutable $createdAt,
+        array $processedBy = []
     ): self {
         $order = new self($customerEmail, $items, $total);
         $order->id = $id;
         $order->status = $status;
         $order->createdAt = $createdAt;
+        $order->processedBy = $processedBy;
         return $order;
     }
 
@@ -63,7 +69,30 @@ class Order
     public function getTotal(): float { return $this->total; }
     public function getStatus(): string { return $this->status; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getProcessedBy(): array { return $this->processedBy; }
+
     public function markAsProcessed(): void { $this->status = 'processed'; }
+
+    /**
+     * Has this specific handler already processed this order?
+     * Idempotency guard: returns true if the handler name is in the processedBy list.
+     */
+    public function isProcessedBy(string $handlerName): bool
+    {
+        return \in_array($handlerName, $this->processedBy, true);
+    }
+
+    /**
+     * Record that a handler has processed this order.
+     * Idempotent: does not add duplicates. Also marks the order status as processed.
+     */
+    public function markProcessedBy(string $handlerName): void
+    {
+        if (!\in_array($handlerName, $this->processedBy, true)) {
+            $this->processedBy[] = $handlerName;
+        }
+        $this->markAsProcessed();
+    }
 
     public function toArray(): array
     {
@@ -73,6 +102,7 @@ class Order
             'items' => $this->items,
             'total' => $this->total,
             'status' => $this->status,
+            'processedBy' => $this->processedBy,
             'createdAt' => $this->createdAt->format('c'),
         ];
     }

@@ -4,60 +4,34 @@ declare(strict_types=1);
 
 namespace App\Messaging\Handler;
 
-use App\Domain\Service\OrderRepositoryInterface;
 use App\Messaging\Message\OrderCreatedMessage;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Clock\Clock;
-use Symfony\Component\Mercure\HubInterface;
-use Symfony\Component\Mercure\Update;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler(fromTransport: 'async_inventory')]
-class UpdateInventoryHandler
+class UpdateInventoryHandler extends AbstractOrderHandler
 {
-    public function __construct(
-        private LoggerInterface $logger,
-        private OrderRepositoryInterface $orderRepository,
-        private HubInterface $hub
-    ) {}
+    protected function getHandlerName(): string
+    {
+        return 'inventory';
+    }
 
-    public function __invoke(OrderCreatedMessage $message): void
+    protected function getSleepSeconds(): int
+    {
+        return 1;
+    }
+
+    protected function onBeforeWork(OrderCreatedMessage $message): void
     {
         $this->logger->info('[INVENTORY] Updating stock for order', [
             'orderId' => $message->getOrderId(),
             'items' => $message->getItems(),
         ]);
+    }
 
-        // Simulate updating stock in database
-        $clock = new Clock();
-        $clock->sleep(1);
-
+    protected function onAfterWork(OrderCreatedMessage $message): void
+    {
         $this->logger->info('[INVENTORY] Stock updated', [
             'orderId' => $message->getOrderId(),
         ]);
-
-        // Update order status
-        $order = $this->orderRepository->find($message->getOrderId());
-        if ($order !== null) {
-            $order->markAsProcessed();
-            $this->orderRepository->save($order);
-            $this->logger->info('[INVENTORY] Order status updated to processed', [
-                'orderId' => $message->getOrderId(),
-            ]);
-
-            // Publish status update to Mercure
-            $update = new Update(
-                topics: "/orders/{$order->getId()}/status",
-                data: json_encode([
-                    'orderId' => $order->getId(),
-                    'status' => $order->getStatus(),
-                    'processedBy' => 'inventory',
-                ])
-            );
-            $this->hub->publish($update);
-            $this->logger->info('[INVENTORY] Published status update to Mercure', [
-                'orderId' => $message->getOrderId(),
-            ]);
-        }
     }
 }

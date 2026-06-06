@@ -74,6 +74,44 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
 
         $this->assertNotNull($updated, 'Order should still exist in the DB');
         $this->assertSame('processed', $updated->getStatus(), 'Handler should have called markAsProcessed');
+        $this->assertSame(['inventory'], $updated->getProcessedBy(), 'Handler should have recorded itself in processedBy');
+    }
+
+    public function testHandlerSkipsWhenAlreadyProcessed(): void
+    {
+        // ARRANGE: create an order already processed by inventory
+        $order = Order::reconstruct(
+            id: 'skipInvtry00001',
+            customerEmail: 'done@example.com',
+            items: ['bolt'],
+            total: 1.50,
+            status: 'processed',
+            createdAt: new \DateTimeImmutable(),
+            processedBy: ['notifications', 'inventory'],
+        );
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        // Mercure should NOT be called
+        $this->hub->expects($this->never())->method('publish');
+        $this->logger->expects($this->any())->method('info');
+
+        $message = new OrderCreatedMessage('skipInvtry00001', 'done@example.com', 1.50, ['bolt']);
+
+        // ACT
+        $this->handler->__invoke($message);
+
+        // ASSERT: processedBy unchanged (still 2 handlers, not 3 with duplicate)
+        $this->entityManager->clear();
+        $updated = $this->repository->find('skipInvtry00001');
+
+        $this->assertNotNull($updated);
+        $this->assertSame(
+            ['notifications', 'inventory'],
+            $updated->getProcessedBy(),
+            'processedBy should not have changed — inventory handler should have skipped'
+        );
     }
 
     public function testHandlerDoesNotCrashWhenOrderNotFound(): void
