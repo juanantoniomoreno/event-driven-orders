@@ -10,9 +10,9 @@ An order management API where creating an order dispatches async events consumed
 
 | Layer       | Technology                    |
 | ----------- | ----------------------------- |
-| Backend     | Symfony 7 + Messenger (Redis) |
+| Backend     | Symfony 7 + Messenger (AMQP)  |
 | Frontend    | React 18 + Vite               |
-| Queue       | Redis Streams                 |
+| Queue       | RabbitMQ (AMQP)               |
 | Realtime    | Mercure (SSE)                 |
 | Database    | PostgreSQL 16 + Doctrine ORM  |
 | Containers  | Docker + Docker Compose       |
@@ -28,7 +28,7 @@ Client → Nginx (8080) → PHP-FPM → Symfony Controller
                                       ↓
                               OrderRepository (Doctrine/PostgreSQL)
                                       ↓
-                          MessageBus → Redis Streams
+                          MessageBus → RabbitMQ (AMQP)
                                           ↓
                     ┌─────────────────────┼─────────────────────┐
                     ↓                     ↓                     ↓
@@ -57,7 +57,7 @@ Client → Nginx (8080) → PHP-FPM → Symfony Controller
 | `nginx`              | 8080 | Reverse proxy to PHP-FPM      |
 | `php`                | —    | Symfony application           |
 | `postgres`           | 5433 | Persistent storage            |
-| `redis`              | 6380 | Message queue (Redis Streams) |
+| `rabbitmq`           | 5673 / 15673 | Message broker (AMQP) + management UI |
 | `mercure`            | 3001 | Real-time SSE hub             |
 | `frontend`           | 3000 | React SPA via Nginx           |
 | `worker_notifications` | —  | Consumes `async_notifications` |
@@ -74,9 +74,12 @@ docker compose up -d --build
 
 ## Known Technical Debt
 
-- **CD workflow outdated**: `cd.yml` references a single `worker` container and `async` transport — should be updated to the 3-worker architecture
-- **No tests**: Phase 6 (PHPUnit, integration, E2E) not started
-- **Mercure JWT hardcoded**: `development_secret_key_change_in_production` in docker-compose.yml
-- **No HTTPS**: Phase 7 not started
-- **Race condition**: All 3 handlers call `markAsProcessed()` independently — no idempotency
-- **Code duplication**: Handlers share ~80% identical code
+- **Race condition / no idempotency**: All 3 handlers call `markAsProcessed()` independently without checking if the order was already processed for that handler. If a message is retried, side effects (email, inventory, analytics) get duplicated (planned as Phase 8.1)
+- **Handler code duplication**: The 3 handlers share ~80% identical structure (load order, sleep, markAsProcessed, publish to Mercure). Refactor candidate for Phase 8.2 — **must be done after 8.1** so the idempotency check can be factored into the shared abstraction
+
+## Resolved
+
+- ~~No tests~~ → Phase 6 complete (unit, integration, functional)
+- ~~Mercure JWT hardcoded~~ → Phase 7.1 (centralized in root `.env`, referenced via `${MERCURE_JWT_SECRET}`)
+- ~~No HTTPS~~ → Phase 7.4 (self-signed cert in `certs/`, nginx on :8443)
+- ~~CD workflow outdated~~ → Phase 7.6 (rewritten for 3 workers + RabbitMQ, with `.env` check, `--remove-orphans`, and worker log verification)

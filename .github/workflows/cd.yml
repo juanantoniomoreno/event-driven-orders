@@ -18,9 +18,41 @@ jobs:
       - name: Deploy to VPS
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -euo pipefail
+
             cd /opt/event-driven-orders
+
+            echo "→ Pulling latest code"
             git pull origin main
-            docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d --build
-            docker compose -f docker-compose.yml exec -T worker php bin/console messenger:consume async -vv &
+
+            # Phase 7.5: docker-compose reads infra credentials (Mercure JWT, RabbitMQ,
+            # PostgreSQL) from .env via ${VAR:-default} substitution. Without .env the
+            # containers would start with dev defaults — fail loud here to surface
+            # misconfiguration on the VPS instead of shipping it to production silently.
+            if [ ! -f .env ]; then
+              echo "::error::.env file missing on VPS. Copy .env.example to .env and fill in real values." >&2
+              exit 1
+            fi
+
+            echo "→ Rebuilding and restarting all services"
+            # --remove-orphans drops containers that no longer exist in compose
+            # (e.g. the old single 'worker' service from before the 3-worker split).
+            docker compose -f docker-compose.yml up -d --build --remove-orphans
+
+            # Workers have no healthcheck (only postgres/rabbitmq do), so we just give
+            # the stack a moment to settle before tailing logs. 15s is enough for
+            # composer install + migrations + AMQP queue declarations to complete.
+            echo "→ Waiting for services to settle"
+            sleep 15
+
+            echo "→ Pruning dangling images"
+            docker image prune -f
+
+            echo "→ Container status"
+            docker compose -f docker-compose.yml ps
+
+            echo "→ Worker logs (last 20 lines each)"
+            docker logs --tail 20 edo_worker_notifications
+            docker logs --tail 20 edo_worker_inventory
+            docker logs --tail 20 edo_worker_analytics
           EOF

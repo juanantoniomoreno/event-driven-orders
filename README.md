@@ -157,13 +157,14 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 - ✅ Functional tests: OrderController HTTP end-to-end (6 tests)
 - ⬜ E2E con Playwright
 
-### 🔄 Fase 7: Producción (en progreso)
+### ✅ Fase 7: Producción
 
 - ✅ 7.1 — Centralizar secreto JWT de Mercure (`.env` raíz, sin hardcodeo)
 - ✅ 7.2 — Hardening de Mercure (quitar anonymous, JWT por endpoint, CORS restringido)
 - ✅ 7.3 — Security headers en Nginx (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, CSP)
-- 🔲 7.4 — HTTPS con certificado self-signed
-- 🔲 7.5 — Higiene de variables de entorno
+- ✅ 7.4 — HTTPS con certificado self-signed (`certs/cert.pem` + `certs/key.pem`, nginx en :8443)
+- ✅ 7.5 — Higiene de variables de entorno (`.env.example` template, parametrización en `docker-compose.yml`)
+- ✅ 7.6 — CD workflow alineado con la arquitectura real (3 workers + RabbitMQ)
 
 ## CI/CD
 
