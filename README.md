@@ -169,6 +169,7 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 ### ✅ Fase 8: Deuda técnica
 
 - ✅ 8.1 — Idempotencia en handlers (columna `processed_by` JSON en Order, cada handler registra su paso, retries se saltan)
+- ✅ 8.2 — Refactor DRY de handlers (Template Method: `AbstractOrderHandler`, 4 hooks por handler, ~30 líneas cada uno)
 
 ## CI/CD
 
