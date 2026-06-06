@@ -155,7 +155,7 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 - ✅ Unit tests: Order, OrderCreatedMessage, CreateOrderService (14 tests, 58 assertions)
 - ✅ Integration tests: repositorio + handlers con SQLite in-memory (8 tests, 25 assertions)
 - ✅ Functional tests: OrderController HTTP end-to-end (6 tests)
-- ⬜ E2E con Playwright
+- ✅ E2E con Playwright (2 tests: crear orden + ver SSE en vivo, carga inicial de página)
 
 ### ✅ Fase 7: Producción
 
