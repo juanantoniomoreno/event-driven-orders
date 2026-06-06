@@ -11,5 +11,11 @@ frontend/node_modules/
 backend/var/cache/
 backend/var/log/
 backend/var/*.db
+
+# Environment files (real secrets, never commit; .env.example IS tracked)
+.env
 .env.local
 .env.*.local
+backend/.env
+backend/.env.local
+backend/.env.*.local

@@ -1,16 +1,37 @@
-
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: edo_redis
+  # Phase 4: PostgreSQL for persistent storage
+  postgres:
+    image: postgres:16-alpine
+    container_name: edo_postgres
     ports:
-      - "6380:6379"
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orders}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orders}
+      POSTGRES_DB: ${POSTGRES_DB:-orders}
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orders}"]
       interval: 5s
       timeout: 3s
+      retries: 5
+
+  # Phase 5: RabbitMQ (AMQP) replaces Redis for message queuing
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: edo_rabbitmq
+    ports:
+      - "5673:5672" # AMQP
+      - "15673:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+      RABBITMQ_ERLANG_COOKIE: dev-cookie-event-driven-orders
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   php:
@@ -20,40 +41,134 @@ services:
     container_name: edo_php
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
+    entrypoint: ["/var/www/html/docker-entrypoint.sh"]
+    command: ["php-fpm"]
     depends_on:
-      redis:
+      rabbitmq:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+      postgres:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
+      # Phase 5: AMQP DSNs for RabbitMQ
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_notifications
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_inventory
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_analytics
+      # Phase 3: Mercure configuration
+      - MERCURE_URL=http://mercure/.well-known/mercure
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
+      # Phase 4: Database URL for Doctrine/PostgreSQL
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
 
   nginx:
     image: nginx:alpine
     container_name: edo_nginx
     ports:
       - "8080:80"
+      - "8443:443"
     volumes:
       - ./backend:/var/www/html
       - ./backend/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - php
 
-  worker:
+  # Phase 3: Mercure Hub for real-time updates
+  mercure:
+    image: dunglas/mercure
+    container_name: edo_mercure
+    ports:
+      - "3001:80"
+    environment:
+      SERVER_NAME: ":80"
+      # JWT keys for authenticating publications and subscriptions
+      # In dev we use the same key, in prod they should be different
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET}
+      # Directives in Caddyfile format: each on its own line
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins http://localhost:3000
+        publish_origins *
+        publish
+        subscribe
+    restart: unless-stopped
+
+  # Phase 2: 3 specialized workers, each consuming its own queue
+  worker_notifications:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: edo_worker
-    command: ["php", "bin/console", "messenger:consume", "async", "-vv"]
+    container_name: edo_worker_notifications
+    command:
+      ["php", "bin/console", "messenger:consume", "async_notifications", "-vv"]
     volumes:
       - ./backend:/var/www/html
-      - /var/www/html/vendor
+    entrypoint: ["/var/www/html/docker-entrypoint.sh"]
     depends_on:
-      redis:
+      rabbitmq:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+      postgres:
         condition: service_healthy
     environment:
       - APP_ENV=dev
-      - MESSENGER_TRANSPORT_DSN=redis://redis:6379/messages
+      - MESSENGER_TRANSPORT_DSN_NOTIFICATIONS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_notifications
+      - MERCURE_URL=http://mercure/.well-known/mercure
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
+    restart: unless-stopped
+
+  worker_inventory:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: edo_worker_inventory
+    command:
+      ["php", "bin/console", "messenger:consume", "async_inventory", "-vv"]
+    volumes:
+      - ./backend:/var/www/html
+    entrypoint: ["/var/www/html/docker-entrypoint.sh"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      - APP_ENV=dev
+      - MESSENGER_TRANSPORT_DSN_INVENTORY=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_inventory
+      - MERCURE_URL=http://mercure/.well-known/mercure
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
+    restart: unless-stopped
+
+  worker_analytics:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: edo_worker_analytics
+    command:
+      ["php", "bin/console", "messenger:consume", "async_analytics", "-vv"]
+    volumes:
+      - ./backend:/var/www/html
+    entrypoint: ["/var/www/html/docker-entrypoint.sh"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mercure:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      - APP_ENV=dev
+      - MESSENGER_TRANSPORT_DSN_ANALYTICS=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/%2f/async_analytics
+      - MERCURE_URL=http://mercure/.well-known/mercure
+      - MERCURE_JWT_SECRET=${MERCURE_JWT_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-orders}:${POSTGRES_PASSWORD:-orders}@postgres:5432/${POSTGRES_DB:-orders}?serverVersion=16&charset=utf8
     restart: unless-stopped
 
   frontend:
@@ -65,6 +180,7 @@ services:
       - "3000:80"
     depends_on:
       - nginx
+      - mercure
 
 volumes:
-  redis_data:
+  postgres_data:

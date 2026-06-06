@@ -4,13 +4,29 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
+use Doctrine\ORM\Mapping as ORM;
+
+#[ORM\Entity]
+#[ORM\Table(name: 'orders')]
 class Order
 {
+    #[ORM\Id]
+    #[ORM\Column(type: 'string', length: 16)]
     private string $id;
+
+    #[ORM\Column(type: 'string', length: 255)]
     private string $customerEmail;
+
+    #[ORM\Column(type: 'json')]
     private array $items;
+
+    #[ORM\Column(type: 'float')]
     private float $total;
+
+    #[ORM\Column(type: 'string', length: 20)]
     private string $status;
+
+    #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
     public function __construct(

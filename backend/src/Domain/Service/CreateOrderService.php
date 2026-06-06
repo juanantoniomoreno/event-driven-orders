@@ -11,7 +11,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 class CreateOrderService
 {
     public function __construct(
-        private OrderRepository $repository,
+        private OrderRepositoryInterface $repository,
         private MessageBusInterface $eventBus
     ) {}
 

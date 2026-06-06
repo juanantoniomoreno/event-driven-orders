@@ -1,0 +1,6 @@
+framework:
+    messenger:
+        transports:
+            async_notifications: "sync://"
+            async_inventory: "sync://"
+            async_analytics: "sync://"

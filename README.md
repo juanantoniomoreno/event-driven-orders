@@ -6,9 +6,11 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 
 | Capa         | Tecnología                    |
 | ------------ | ----------------------------- |
-| Backend      | Symfony 7 + Messenger (Redis) |
+| Backend      | Symfony 7 + Messenger         |
 | Frontend     | React 18 + Vite (mínimo)      |
-| Cola         | Redis Streams                 |
+| Cola         | RabbitMQ (AMQP)               |
+| Base de datos| PostgreSQL 16 + Doctrine ORM  |
+| Tiempo real  | Mercure Hub (SSE)             |
 | Contenedores | Docker + Docker Compose       |
 | CI/CD        | GitHub Actions                |
 
@@ -18,36 +20,59 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 ├── backend/
 │   ├── src/
 │   │   ├── Controller/          # HTTP API (REST)
-│   │   ├── Domain/
-│   │   │   ├── Entity/          # Order (modelo de dominio)
-│   │   │   └── Service/         # Lógica de negocio + repositorio
-│   │   └── Messaging/
-│   │       ├── Message/         # OrderCreatedMessage (para Messenger)
-│   │       └── Handler/         # Procesadores async
-│   ├── config/                  # Symfony config
+│   │   ├── Entity/              # Order (Doctrine ORM)
+│   │   ├── Repository/          # OrderRepository (Doctrine)
+│   │   ├── Service/             # CreateOrderService
+│   │   └── MessageHandler/      # 3 handlers especializados
+│   ├── config/                  # Symfony + Messenger + Doctrine
+│   ├── migrations/              # Doctrine migrations
 │   ├── public/                  # Entry point
-│   ├── Dockerfile               # PHP-FPM + Redis extension
+│   ├── docker-entrypoint.sh     # Auto-migraciones al iniciar
+│   ├── Dockerfile               # PHP-FPM + pgsql + amqp
 │   └── nginx.conf               # Reverse proxy
 ├── frontend/
 │   ├── src/
-│   │   └── main.jsx             # App React mínima
+│   │   └── main.jsx             # App React con SSE
 │   ├── Dockerfile               # Multi-stage (build + nginx)
-│   └── nginx.conf               # Proxy a API
-├── docker-compose.yml           # Redis + PHP + Nginx + Worker + Frontend
+│   └── nginx.conf               # Proxy a API + Mercure
+├── docker-compose.yml           # 8 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
 └── .github/workflows/
     ├── ci.yml                   # Build, lint, test en PR/push
-    └── cd.yml                   # Deploy automático a VPS
+    └── cd.yml                   # Deploy automático a VPS (⚠️ desactualizado)
 ```
 
-## Flujo de eventos (Fase 1)
+## Flujo de eventos (arquitectura actual)
 
 1. Cliente hace `POST /api/orders`
-2. Symfony crea la orden y **dispacha** `OrderCreatedMessage`
-3. Messenger la serializa y la **encola en Redis**
-4. El **worker** (`messenger:consume async`) la recoge y ejecuta el handler
-5. El handler simula procesamiento (sleep + log)
+2. Symfony crea la orden en PostgreSQL y **dispacha** `OrderCreatedMessage`
+3. Messenger serializa y **fan-out** a 3 colas RabbitMQ (`async_notifications`, `async_inventory`, `async_analytics`)
+4. Cada **worker** especializado consume su cola y ejecuta su handler
+5. Cada handler publica el nuevo estado al **Mercure Hub** (tópico `orders/{id}`)
+6. El **frontend** recibe la actualización en tiempo real por SSE
 
-Esto es programación orientada a eventos: el controlador no sabe quién va a procesar la orden, solo dice "pasó esto".
+Esto es programación orientada a eventos: el controlador no sabe quién va a procesar la orden, solo dice "pasó esto". Los workers son independientes y escalables.
+
+## Configuración (variables de entorno)
+
+Las variables de entorno se cargan desde dos lugares:
+
+- **`.env`** en la raíz del proyecto — leído por Docker Compose. Contiene credenciales de backing services (RabbitMQ, PostgreSQL) y el secreto JWT de Mercure.
+- **`backend/.env`** — leído por Symfony. Contiene solo variables de Symfony (`APP_ENV`, `APP_SECRET`, `MERCURE_URL`, etc.).
+
+Ambos archivos están en `.gitignore`. El repo incluye **`.env.example`** como plantilla pública con valores placeholder. En un entorno nuevo:
+
+```bash
+# 1. Copiar la plantilla y editar con valores reales
+cp .env.example .env
+# Generar un secreto JWT de 64 chars (256 bits mínimo, 512 bits recomendado):
+openssl rand -hex 32
+# Pegar el resultado en MERCURE_JWT_SECRET dentro de .env
+
+# 2. Para Symfony, los valores dev de `backend/.env` son suficientes
+# Si necesitás overrides locales, usá `backend/.env.local` (no se commitea)
+```
+
+> En producción, las credenciales deben venir de un secrets manager (Docker Secrets, Vault, AWS Secrets Manager), nunca del `.env` commiteado.
 
 ## Cómo levantarlo
 
@@ -66,12 +91,17 @@ cd ..
 docker compose up -d --build
 
 # 4. Verificar servicios
-# API:        http://localhost:8080/api/orders
-# Frontend:   http://localhost:3000
-# Redis:      docker exec edo_redis redis-cli ping
+# API (HTTP):  http://localhost:8080/api/orders  (redirige a HTTPS)
+# API (HTTPS): https://localhost:8443/api/orders  (cert self-signed)
+# Frontend:    http://localhost:3000
+# Mercure:     http://localhost:3001/.well-known/mercure
+# RabbitMQ:    http://localhost:15673 (guest/guest)
+# PostgreSQL:  docker exec edo_postgres psql -U orders -d orders
 
-# 5. Ver logs del worker (procesamiento async)
-docker logs -f edo_worker
+# 5. Ver logs de los workers
+docker logs -f edo_worker_notifications
+docker logs -f edo_worker_inventory
+docker logs -f edo_worker_analytics
 ```
 
 ## API
@@ -94,39 +124,47 @@ curl -X POST http://localhost:8080/api/orders \
 
 ### ✅ Fase 1: Eventos de dominio con Messenger + Redis
 
-Lo que ya está armado. Eventos async con worker separado.
+Eventos async con worker separado usando Redis Streams.
 
-### ⬜ Fase 2: Múltiples workers especializados
+### ✅ Fase 2: Múltiples workers especializados
 
-Separar handlers en distintos consumers:
+Tres workers independientes, cada uno con su propia cola en Redis:
 
-- `notifications` (email)
-- `inventory` (stock)
-- `analytics` (métricas)
+- `worker_notifications` → envía confirmación por email
+- `worker_inventory` → actualiza stock
+- `worker_analytics` → registra métricas
 
-### ⬜ Fase 3: Tiempo real
+El message bus hace fan-out: un solo `OrderCreatedMessage` se enruta a las 3 colas.
 
-Agregar Mercure o SSE para notificar al frontend cuando una orden cambia de estado.
+### ✅ Fase 3: Tiempo real con Mercure
 
-### ⬜ Fase 4: Persistencia real
+Mercure Hub notifica al frontend por SSE cuando una orden cambia de estado.
+Cada handler publica updates al tópico `orders/{id}` después de procesar.
 
-Reemplazar el repositorio en memoria por Doctrine + PostgreSQL.
+### ✅ Fase 4: Persistencia con PostgreSQL + Doctrine
 
-### ⬜ Fase 5: RabbitMQ
+Reemplazo de SQLite por PostgreSQL 16 con Doctrine ORM.
+Entidad `Order` mapeada, migraciones automáticas al levantar los contenedores.
 
-Migrar el transport de Redis a RabbitMQ para aprender AMQP.
+### ✅ Fase 5: RabbitMQ
 
-### ⬜ Fase 6: Testing
+Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas AMQP con rabbitmq:4-management.
 
-- Unit tests con PHPUnit
-- Integration tests para handlers
-- E2E con Playwright
+### ✅ Fase 6: Testing
 
-### ⬜ Fase 7: Producción
+- ✅ Unit tests: Order, OrderCreatedMessage, CreateOrderService (14 tests, 58 assertions)
+- ✅ Integration tests: repositorio + handlers con SQLite in-memory (8 tests, 25 assertions)
+- ✅ Functional tests: OrderController HTTP end-to-end (6 tests)
+- ⬜ E2E con Playwright
 
-- HTTPS con Let's Encrypt
-- Secrets en GitHub
-- Docker Swarm o AWS ECS
+### ✅ Fase 7: Producción
+
+- ✅ 7.1 — Centralizar secreto JWT de Mercure (`.env` raíz, sin hardcodeo)
+- ✅ 7.2 — Hardening de Mercure (quitar anonymous, JWT por endpoint, CORS restringido)
+- ✅ 7.3 — Security headers en Nginx (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, CSP)
+- ✅ 7.4 — HTTPS con certificado self-signed (`certs/cert.pem` + `certs/key.pem`, nginx en :8443)
+- ✅ 7.5 — Higiene de variables de entorno (`.env.example` template, parametrización en `docker-compose.yml`)
+- ✅ 7.6 — CD workflow alineado con la arquitectura real (3 workers + RabbitMQ)
 
 ## CI/CD
 
