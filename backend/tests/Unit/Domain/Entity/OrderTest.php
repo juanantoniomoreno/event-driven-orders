@@ -81,6 +81,7 @@ class OrderTest extends TestCase
         $this->assertArrayHasKey('items', $array);
         $this->assertArrayHasKey('total', $array);
         $this->assertArrayHasKey('status', $array);
+        $this->assertArrayHasKey('processedBy', $array);
         $this->assertArrayHasKey('createdAt', $array);
 
         $this->assertSame($order->getId(), $array['id']);
@@ -88,10 +89,106 @@ class OrderTest extends TestCase
         $this->assertSame(['sku-1'], $array['items']);
         $this->assertSame(25.00, $array['total']);
         $this->assertSame('pending', $array['status']);
+        $this->assertSame([], $array['processedBy']);
         $this->assertMatchesRegularExpression(
             '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}$/',
             $array['createdAt']
         );
+    }
+
+    public function testGetProcessedByEmptyByDefault(): void
+    {
+        $order = new Order('test@example.com', [], 0.0);
+
+        $this->assertSame([], $order->getProcessedBy());
+    }
+
+    public function testIsProcessedByReturnsFalseWhenNotProcessed(): void
+    {
+        $order = new Order('test@example.com', [], 0.0);
+
+        $this->assertFalse($order->isProcessedBy('notifications'));
+        $this->assertFalse($order->isProcessedBy('inventory'));
+        $this->assertFalse($order->isProcessedBy('analytics'));
+    }
+
+    public function testMarkProcessedByTracksHandler(): void
+    {
+        $order = new Order('test@example.com', [], 0.0);
+
+        $order->markProcessedBy('notifications');
+
+        $this->assertTrue($order->isProcessedBy('notifications'));
+        $this->assertSame(['notifications'], $order->getProcessedBy());
+        $this->assertSame('processed', $order->getStatus());
+    }
+
+    public function testMarkProcessedByIsIdempotent(): void
+    {
+        $order = new Order('test@example.com', [], 0.0);
+
+        $order->markProcessedBy('notifications');
+        $order->markProcessedBy('notifications');
+        $order->markProcessedBy('notifications');
+
+        // Handler should appear only once in the list
+        $this->assertSame(['notifications'], $order->getProcessedBy());
+        $this->assertTrue($order->isProcessedBy('notifications'));
+    }
+
+    public function testMarkProcessedByMultipleHandlers(): void
+    {
+        $order = new Order('test@example.com', [], 0.0);
+
+        $order->markProcessedBy('notifications');
+        $order->markProcessedBy('inventory');
+        $order->markProcessedBy('analytics');
+
+        $this->assertSame(
+            ['notifications', 'inventory', 'analytics'],
+            $order->getProcessedBy()
+        );
+        $this->assertTrue($order->isProcessedBy('notifications'));
+        $this->assertTrue($order->isProcessedBy('inventory'));
+        $this->assertTrue($order->isProcessedBy('analytics'));
+    }
+
+    public function testReconstructWithProcessedBy(): void
+    {
+        $createdAt = new \DateTimeImmutable();
+        $processedBy = ['notifications', 'inventory'];
+
+        $order = Order::reconstruct(
+            id: 'rec1234567890abcd',
+            customerEmail: 'rec@example.com',
+            items: ['x', 'y'],
+            total: 50.0,
+            status: 'processed',
+            createdAt: $createdAt,
+            processedBy: $processedBy,
+        );
+
+        $this->assertSame('rec1234567890abcd', $order->getId());
+        $this->assertSame('processed', $order->getStatus());
+        $this->assertSame(['notifications', 'inventory'], $order->getProcessedBy());
+        $this->assertTrue($order->isProcessedBy('notifications'));
+        $this->assertTrue($order->isProcessedBy('inventory'));
+        $this->assertFalse($order->isProcessedBy('analytics'));
+    }
+
+    public function testReconstructDefaultsToEmptyProcessedBy(): void
+    {
+        // Backward compat: reconstruct() with no processedBy arg defaults to []
+        $order = Order::reconstruct(
+            id: 'def1234567890abcd',
+            customerEmail: 'def@example.com',
+            items: ['z'],
+            total: 10.0,
+            status: 'pending',
+            createdAt: new \DateTimeImmutable(),
+        );
+
+        $this->assertSame([], $order->getProcessedBy());
     }
 
     public function testEmptyItemsAndZeroTotal(): void
