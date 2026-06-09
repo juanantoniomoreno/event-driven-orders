@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
 
 const API = "/api";
-const MERCURE_URL = "http://localhost:3001/.well-known/mercure";
+const MERCURE_URL = "/mercure/.well-known/mercure";
 
 function App() {
 	const [orders, setOrders] = useState([]);
