@@ -51,6 +51,11 @@ jobs:
             echo "→ Waiting for services to settle"
             sleep 15
 
+            # When php container is recreated it gets a new IP. Nginx caches the old
+            # one at startup and returns 502 until restarted. Force a restart here.
+            echo "→ Restarting nginx to pick up new PHP IP"
+            docker compose -f docker-compose.yml restart nginx
+
             echo "→ Pruning dangling images"
             docker image prune -f
 
