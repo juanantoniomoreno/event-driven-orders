@@ -97,7 +97,7 @@ function App() {
 
 	return (
 		<div style={{ maxWidth: 600, margin: "0 auto", padding: 20 }}>
-			<h1>Event-Driven Orders</h1>
+			<h1>Event-Driven Orders (prueba manual ci/cd)</h1>
 			<form onSubmit={createOrder}>
 				<input
 					placeholder="Email"
