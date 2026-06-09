@@ -34,6 +34,14 @@ jobs:
               exit 1
             fi
 
+            # The php/worker containers mount ./backend as a volume, which overwrites
+            # the vendor/ installed during image build. Install deps on the host so
+            # the volume has a complete vendor/ directory before containers start.
+            echo "→ Installing PHP dependencies"
+            docker run --rm -v "$(pwd)/backend:/app" -w /app composer:latest \
+              composer install --no-interaction --optimize-autoloader \
+              --ignore-platform-req=ext-amqp
+
             echo "→ Rebuilding and restarting all services"
             # --remove-orphans drops containers that no longer exist in compose
             # (e.g. the old single 'worker' service from before the 3-worker split).
