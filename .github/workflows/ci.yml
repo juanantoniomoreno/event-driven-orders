@@ -27,7 +27,7 @@ jobs:
             publish
             subscribe
         options: >-
-          --health-cmd "curl -f http://localhost:80/.well-known/mercure || exit 1"
+          --health-cmd "curl -s -o /dev/null -w '%{http_code}' http://localhost:80/.well-known/mercure | grep -qE '^(200|401)$'"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 15
