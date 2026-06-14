@@ -105,13 +105,25 @@ jobs:
           EOF
 
       - name: Build and start Docker stack
-        run: docker compose up -d --build
+        run: |
+          set -e
+          docker compose up -d --build
+          echo "Docker stack status:"
+          docker compose ps
 
       - name: Wait for backend API
         run: |
           echo "Waiting for backend API to be ready..."
-          timeout 120 bash -c 'until curl -sf -o /dev/null http://localhost:8080/api/orders; do sleep 3; done'
-          echo "Backend API is ready."
+          if timeout 180 bash -c 'until curl -sf -o /dev/null http://localhost:8080/api/orders; do sleep 3; done'; then
+            echo "Backend API is ready."
+          else
+            echo "Backend API did not become ready within 180s."
+            echo "--- docker compose ps ---"
+            docker compose ps
+            echo "--- docker compose logs (last 150 lines) ---"
+            docker compose logs --tail 150
+            exit 1
+          fi
 
       - name: Wait for frontend
         run: |
