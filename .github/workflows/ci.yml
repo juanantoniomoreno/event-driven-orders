@@ -105,8 +105,9 @@ jobs:
           EOF
 
       - name: Install PHP dependencies for volume mount
-        working-directory: backend
-        run: composer install --no-interaction --prefer-dist
+        run: |
+          docker run --rm -v "$(pwd)/backend:/app" -w /app composer:latest \
+            composer install --no-interaction --prefer-dist --ignore-platform-req=ext-amqp
 
       - name: Build and start Docker stack
         run: |
