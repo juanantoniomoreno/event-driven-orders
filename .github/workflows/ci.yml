@@ -133,6 +133,9 @@ jobs:
           npm ci
           npx playwright install --with-deps
 
+      - name: Truncate orders table before E2E run
+        run: docker exec edo_postgres psql -U orders -d orders -c "TRUNCATE orders CASCADE;"
+
       - name: Run Playwright E2E tests
         working-directory: frontend
         run: npx playwright test
