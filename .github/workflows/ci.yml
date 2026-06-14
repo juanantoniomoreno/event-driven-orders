@@ -35,17 +35,27 @@ jobs:
       - name: Warm up test cache
         run: php bin/console cache:clear --env=test
 
-      - name: Create test database schema
+      - name: Debug SQLite environment
+        run: |
+          echo "DATABASE_URL=${DATABASE_URL}"
+          php -m | grep -i sqlite || true
+          php -r "var_dump(PDO::getAvailableDrivers());"
+          php -r "var_dump(getenv('DATABASE_URL'));"
         env:
-          APP_ENV: test
           DATABASE_URL: "sqlite:///tmp/event-driven-orders-test.db"
-        run: php bin/console doctrine:schema:create --env=test
+
+      - name: Create test database schema
+        run: |
+          export APP_ENV=test
+          export DATABASE_URL="sqlite:///tmp/event-driven-orders-test.db"
+          touch /tmp/event-driven-orders-test.db
+          php bin/console doctrine:schema:create --env=test
 
       - name: Run PHPUnit
-        env:
-          APP_ENV: test
-          DATABASE_URL: "sqlite:///tmp/event-driven-orders-test.db"
-        run: php vendor/bin/phpunit
+        run: |
+          export APP_ENV=test
+          export DATABASE_URL="sqlite:///tmp/event-driven-orders-test.db"
+          php vendor/bin/phpunit
 
   frontend:
     runs-on: ubuntu-latest
