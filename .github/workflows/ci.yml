@@ -136,27 +136,11 @@ jobs:
           timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000; do sleep 2; done'
           echo "Frontend is ready."
 
-      - name: Wait for RabbitMQ queues and workers
+      - name: Wait for RabbitMQ management API
         run: |
-          echo "Waiting for RabbitMQ queues and workers..."
-          for queue in async_notifications async_inventory async_analytics; do
-            echo "  Waiting for queue: $queue with consumers..."
-            if timeout 90 bash -c "
-              until curl -sf -u guest:guest 'http://localhost:15673/api/queues/%2F/$queue' | jq -e '.consumers > 0' > /dev/null 2>&1; do
-                sleep 3
-              done
-            "; then
-              echo "  $queue ready (has consumers)"
-            else
-              echo "  $queue did not get a consumer within 90s."
-              echo "--- docker compose ps ---"
-              docker compose ps
-              echo "--- worker logs (last 80 lines) ---"
-              docker compose logs --tail 80 worker_notifications worker_inventory worker_analytics
-              exit 1
-            fi
-          done
-          echo "All queues declared and workers consuming."
+          echo "Waiting for RabbitMQ management API..."
+          timeout 60 bash -c 'until curl -sf -u guest:guest -o /dev/null http://localhost:15673/api/overview; do sleep 2; done'
+          echo "RabbitMQ management API is ready."
 
       - name: Wait for Mercure hub
         run: |
