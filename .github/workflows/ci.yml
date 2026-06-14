@@ -100,6 +100,26 @@ jobs:
           timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000; do sleep 2; done'
           echo "Frontend is ready."
 
+      - name: Wait for RabbitMQ queues and workers
+        run: |
+          echo "Waiting for RabbitMQ queues and workers..."
+          for queue in async_notifications async_inventory async_analytics; do
+            echo "  Waiting for queue: $queue with consumers..."
+            timeout 60 bash -c "
+              until curl -sf -u guest:guest 'http://localhost:15673/api/queues/%2F/$queue' | jq -e '.consumers > 0' > /dev/null 2>&1; do
+                sleep 3
+              done
+            "
+            echo "  $queue ready (has consumers)"
+          done
+          echo "All queues declared and workers consuming."
+
+      - name: Wait for Mercure hub
+        run: |
+          echo "Waiting for Mercure hub..."
+          timeout 30 bash -c 'until curl -sf -o /dev/null http://localhost:3001/.well-known/mercure; do sleep 2; done'
+          echo "Mercure hub is ready."
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
