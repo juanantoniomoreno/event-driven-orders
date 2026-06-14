@@ -9,11 +9,4 @@ export default defineConfig({
 		headless: true,
 		screenshot: "only-on-failure",
 	},
-	webServer: {
-		command:
-			"docker compose -f ../docker-compose.yml ps --status running | grep -q edo_frontend || exit 1",
-		cwd: ".",
-		reuseExistingServer: true,
-		timeout: 1000,
-	},
 });
