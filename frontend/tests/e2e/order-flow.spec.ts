@@ -17,11 +17,12 @@ test("create order and watch it process via SSE", async ({ page, request }) => {
 	await page.click('button[type="submit"]');
 
 	// The new order should appear immediately with status "pending"
-	const firstOrder = page.locator("li").first();
-	await expect(firstOrder).toContainText(email);
+	// Locate by unique email so stale orders from retries don't break assertions
+	const orderRow = page.locator("li", { hasText: email });
+	await expect(orderRow).toContainText(email);
 	// JS parseFloat strips the trailing zero: 42.50 → 42.5
-	await expect(firstOrder).toContainText("$42.5");
-	await expect(firstOrder).toContainText("pending");
+	await expect(orderRow).toContainText("$42.5");
+	await expect(orderRow).toContainText("pending");
 
 	// Find the order ID via the backend API so we can poll for completion
 	const listRes = await request.get("/api/orders");
@@ -45,7 +46,7 @@ test("create order and watch it process via SSE", async ({ page, request }) => {
 	expect(orderStatus).toBe("processed");
 
 	// Verify the UI reflects the status update pushed via Mercure SSE
-	await expect(firstOrder).toContainText("processed");
+	await expect(orderRow).toContainText("processed");
 });
 
 test("existing orders are loaded on page refresh", async ({ page }) => {
