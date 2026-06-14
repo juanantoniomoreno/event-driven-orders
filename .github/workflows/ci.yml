@@ -32,6 +32,18 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
 
+      - name: Start Mercure hub for functional tests
+        run: |
+          docker run -d --name mercure-test -p 3001:80 \
+            -e SERVER_NAME=:80 \
+            -e MERCURE_PUBLISHER_JWT_KEY=test_secret_key_for_testing_only \
+            -e MERCURE_SUBSCRIBER_JWT_KEY=test_secret_key_for_testing_only \
+            -e MERCURE_EXTRA_DIRECTIVES=$'cors_origins *\npublish_origins *\npublish\nsubscribe' \
+            dunglas/mercure
+          echo "Waiting for Mercure hub to be ready..."
+          timeout 30 bash -c 'until curl -sf -o /dev/null http://localhost:3001/.well-known/mercure; do sleep 1; done'
+          echo "Mercure hub is ready."
+
       - name: Warm up test cache
         run: php bin/console cache:clear --env=test
 
