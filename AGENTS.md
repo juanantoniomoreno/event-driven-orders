@@ -85,3 +85,4 @@ docker compose up -d --build
 - ~~CD workflow outdated~~ → Phase 7.6 (rewritten for 3 workers + RabbitMQ, with `.env` check, `--remove-orphans`, and worker log verification)
 - ~~Race condition / no idempotency~~ → Phase 8.1 (Order.`processedBy` JSON column, each handler checks `isProcessedBy()` before doing work, retries are silently skipped)
 - ~~Handler code duplication~~ → Phase 8.2 (extracted Template Method into `AbstractOrderHandler`; each handler is now ~30 lines implementing 4 hooks)
+- ~~No validation / No DTOs / No error handling~~ → Phase 9.1 (typed `CreateOrderRequest` DTO with Symfony Validator; `OrderController::create()` returns structured field-level 400 errors; invalid JSON returns `{errors: {_body: ["Invalid JSON body"]}}`)

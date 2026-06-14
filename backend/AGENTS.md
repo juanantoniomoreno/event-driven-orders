@@ -13,6 +13,8 @@ src/
 ├── Controller/        # HTTP layer — thin, delegates to services
 │   ├── OrderController.php
 │   └── MercureJwtController.php
+├── Dto/               # Request DTOs with Symfony Validator constraints
+│   └── CreateOrderRequest.php
 ├── Domain/
 │   ├── Entity/        # Doctrine entities (Order)
 │   └── Service/       # Business logic + repository interface/implementations
@@ -88,8 +90,11 @@ php bin/console cache:clear
 
 ## Known Technical Debt
 
-- **No validation**: No Symfony Validator usage — input validation is missing in `OrderController::create()`
-- **No DTOs**: Controllers work with raw `json_decode` arrays instead of typed request objects
-- **No error handling**: No custom exception handling or API error format — errors return generic 500
 - **Float for money**: `float $total` causes floating-point precision issues; needs a Money value object
 - **Race condition on `processedBy`**: JSON column can lose data under concurrent handler saves (last write wins). Individual idempotency works, but `processedBy` won't reliably reflect all handlers. Fix: optimistic locking or separate `order_handler_status` table.
+
+## Resolved
+
+- ~~No validation~~ → Phase 9.1 (Symfony Validator via `CreateOrderRequest` DTO)
+- ~~No DTOs~~ → Phase 9.1 (typed `CreateOrderRequest` with `NotBlank`, `Email`, `NotNull`, `Count`, `GreaterThan` constraints)
+- ~~No error handling~~ → Phase 9.1 (structured 400 responses with field-level errors; invalid JSON returns `{errors: {_body: ["Invalid JSON body"]}}`)
