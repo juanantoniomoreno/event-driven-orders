@@ -19,26 +19,30 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 ```
 ├── backend/
 │   ├── src/
-│   │   ├── Controller/          # HTTP API (REST)
-│   │   ├── Entity/              # Order (Doctrine ORM)
-│   │   ├── Repository/          # OrderRepository (Doctrine)
-│   │   ├── Service/             # CreateOrderService
-│   │   └── MessageHandler/      # 3 handlers especializados
-│   ├── config/                  # Symfony + Messenger + Doctrine
-│   ├── migrations/              # Doctrine migrations
-│   ├── public/                  # Entry point
-│   ├── docker-entrypoint.sh     # Auto-migraciones al iniciar
-│   ├── Dockerfile               # PHP-FPM + pgsql + amqp
-│   └── nginx.conf               # Reverse proxy
+│   │   ├── Controller/              # HTTP API (REST)
+│   │   ├── Domain/
+│   │   │   ├── Entity/             # Order (Doctrine ORM)
+│   │   │   └── Service/            # CreateOrderService, OrderRepositoryInterface, DoctrineOrderRepository
+│   │   ├── Messaging/
+│   │   │   ├── Message/            # OrderCreatedMessage (DTO inmutable)
+│   │   │   └── Handler/            # AbstractOrderHandler + 3 handlers especializados
+│   │   └── Kernel.php
+│   ├── config/                      # Symfony + Messenger + Doctrine
+│   ├── migrations/                  # Doctrine migrations
+│   ├── public/                      # Entry point
+│   ├── docker-entrypoint.sh         # Auto-migraciones al iniciar
+│   ├── Dockerfile                    # PHP-FPM + pgsql + amqp
+│   └── nginx.conf                   # Reverse proxy
 ├── frontend/
 │   ├── src/
-│   │   └── main.jsx             # App React con SSE
-│   ├── Dockerfile               # Multi-stage (build + nginx)
-│   └── nginx.conf               # Proxy a API + Mercure
-├── docker-compose.yml           # 8 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
+│   │   └── main.jsx                 # App React con SSE
+│   ├── tests/e2e/                   # Playwright E2E tests
+│   ├── Dockerfile                    # Multi-stage (build + nginx)
+│   └── nginx.conf                   # Proxy a API + Mercure
+├── docker-compose.yml               # 8 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
 └── .github/workflows/
-    ├── ci.yml                   # Build, lint, test en PR/push
-    └── cd.yml                   # Deploy automático a VPS (⚠️ desactualizado)
+    ├── ci.yml                       # Build, lint en PR/push
+    └── cd.yml                       # Deploy automático a VPS
 ```
 
 ## Flujo de eventos (arquitectura actual)
@@ -124,17 +128,17 @@ curl -X POST http://localhost:8080/api/orders \
 
 ### ✅ Fase 1: Eventos de dominio con Messenger + Redis
 
-Eventos async con worker separado usando Redis Streams.
+Eventos async con worker separado usando Redis Streams. *(Nota: el transporte actual es RabbitMQ desde la Fase 5.)*
 
 ### ✅ Fase 2: Múltiples workers especializados
 
-Tres workers independientes, cada uno con su propia cola en Redis:
+Tres workers independientes, cada uno con su propia cola:
 
 - `worker_notifications` → envía confirmación por email
 - `worker_inventory` → actualiza stock
 - `worker_analytics` → registra métricas
 
-El message bus hace fan-out: un solo `OrderCreatedMessage` se enruta a las 3 colas.
+El message bus hace fan-out: un solo `OrderCreatedMessage` se enruta a las 3 colas. *(Nota: originalmente usaba Redis, migrado a RabbitMQ en Fase 5.)*
 
 ### ✅ Fase 3: Tiempo real con Mercure
 
@@ -173,7 +177,7 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker.
+- **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker. **Nota: no ejecuta phpunit**, solo build y lint.
 - **CD** (`.github/workflows/cd.yml`): Deploy automático a VPS via SSH cuando se mergea a `main`.
 
 Configurá estos secrets en tu repo:
@@ -181,6 +185,14 @@ Configurá estos secrets en tu repo:
 - `SSH_PRIVATE_KEY`
 - `SSH_USER`
 - `SSH_HOST`
+
+## Deuda técnica conocida
+
+1. **`float $total` para dinero**: Causa problemas de precisión en coma flotante. Necesita un value object Money.
+2. **Sin validación de entrada**: `OrderController::create()` no valida el JSON entrante. Faltan DTOs y Symfony Validator.
+3. **Sin manejo estructurado de errores**: Errores devuelven 500 genérico en vez de 400 con JSON de validación.
+4. **Condición de carrera en `processedBy`**: La columna JSON puede perder datos cuando múltiples handlers guardan concurrentemente (last write wins). La idempotencia individual funciona, pero `processedBy` no refleja todos los handlers que corrieron. Fix: optimistic locking o tabla `order_handler_status`.
+5. **CI sin tests**: El pipeline de CI solo hace build y lint, no ejecuta `phpunit`.
 
 ---
 

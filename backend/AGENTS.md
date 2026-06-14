@@ -11,19 +11,28 @@ Layered architecture with domain separation:
 ```
 src/
 ├── Controller/        # HTTP layer — thin, delegates to services
+│   ├── OrderController.php
+│   └── MercureJwtController.php
 ├── Domain/
 │   ├── Entity/        # Doctrine entities (Order)
 │   └── Service/       # Business logic + repository interface/implementations
+│       ├── CreateOrderService.php
+│       ├── OrderRepositoryInterface.php
+│       └── DoctrineOrderRepository.php
 ├── Messaging/
 │   ├── Message/       # Immutable message DTOs for Messenger
+│   │   └── OrderCreatedMessage.php
 │   └── Handler/       # Async processors (one per transport)
-├── DataFixtures/      # Test data loading
+│       ├── AbstractOrderHandler.php   # Template Method pattern
+│       ├── SendOrderConfirmationHandler.php
+│       ├── UpdateInventoryHandler.php
+│       └── TrackOrderAnalyticsHandler.php
 └── Kernel.php
 ```
 
 ## Conventions
 
-- **Strict types**: Every PHP file starts with `declare(strict_types=1);`
+- **Strict Types**: Every PHP file starts with `declare(strict_types=1);`
 - **Constructor injection**: All dependencies via constructor with PHP 8 promoted properties
 - **Namespace**: `App\` maps to `src/`
 - **Routing**: YAML-based (`config/routes.yaml`), not annotations/attributes
@@ -36,12 +45,25 @@ src/
 - **Repository interface**: Domain defines the interface, infrastructure provides the implementation
 - **Fan-out messaging**: One `OrderCreatedMessage` dispatches to 3 transports simultaneously
 - **Mercure integration**: Handlers publish real-time updates after processing
+- **Template Method (AbstractOrderHandler)**: Each handler extends `AbstractOrderHandler` and implements 4 hooks (`validateMessage`, `isAlreadyProcessed`, `doExecute`, `publishUpdate`). Result: ~30 lines per handler, zero duplication.
 
 ## Database
 
 PostgreSQL 16 with Doctrine ORM. Entity mapping via PHP 8 attributes in `Order.php`.
 
 Migration file: `backend/migrations/Version20250530000000.php`
+
+## Testing
+
+Test suite lives in `backend/tests/` with three layers:
+
+| Suite | Location | Tests | Assertions |
+| ----- | -------- | ----- | ---------- |
+| Unit | `tests/Unit/Domain/` + `tests/Unit/Messaging/` | Order, OrderCreatedMessage, CreateOrderService | 14 tests / 58 assertions |
+| Integration | `tests/Integration/` | DoctrineOrderRepository + handlers (SQLite in-memory) | 8 tests / 25 assertions |
+| Functional | `tests/Functional/Controller/` | OrderController HTTP end-to-end | 6 tests |
+
+Run with: `php bin/phpunit`
 
 ## Commands
 
@@ -52,13 +74,13 @@ php -S localhost:8000 -t public
 # Doctrine migrations
 php bin/console doctrine:migrations:migrate
 
-# Load fixtures
-php bin/console doctrine:fixtures:load
-
 # Consume messages (one per terminal)
 php bin/console messenger:consume async_notifications -vv
 php bin/console messenger:consume async_inventory -vv
 php bin/console messenger:consume async_analytics -vv
+
+# Run test suite
+php bin/phpunit
 
 # Clear cache
 php bin/console cache:clear
@@ -66,9 +88,8 @@ php bin/console cache:clear
 
 ## Known Technical Debt
 
-- **No validation**: No Symfony Validator usage — input validation is missing
-- **No DTOs**: Controllers work with raw `json_decode` arrays
-- **No error handling**: No custom exception handling or API error format
-- **No tests**: No `tests/` directory exists
-- **Float for money**: `float $total` causes precision issues
-- **SQLite backup**: `OrderRepository` (SQLite) kept but unused — consider removing
+- **No validation**: No Symfony Validator usage — input validation is missing in `OrderController::create()`
+- **No DTOs**: Controllers work with raw `json_decode` arrays instead of typed request objects
+- **No error handling**: No custom exception handling or API error format — errors return generic 500
+- **Float for money**: `float $total` causes floating-point precision issues; needs a Money value object
+- **Race condition on `processedBy`**: JSON column can lose data under concurrent handler saves (last write wins). Individual idempotency works, but `processedBy` won't reliably reflect all handlers. Fix: optimistic locking or separate `order_handler_status` table.
