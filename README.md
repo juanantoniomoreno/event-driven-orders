@@ -175,6 +175,12 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 - ✅ 8.1 — Idempotencia en handlers (columna `processed_by` JSON en Order, cada handler registra su paso, retries se saltan)
 - ✅ 8.2 — Refactor DRY de handlers (Template Method: `AbstractOrderHandler`, 4 hooks por handler, ~30 líneas cada uno)
 
+### ✅ Fase 9: Validación y DTOs
+
+- ✅ 9.1 — DTO tipado para creación de órdenes (`CreateOrderRequest` con constraints Symfony Validator: `NotBlank`, `Email`, `NotNull`, `Count`, `GreaterThan`)
+- ✅ 9.1 — Validación de entrada en `OrderController::create()` con respuesta estructurada 400 campo por campo (`{errors: {customerEmail: ["..."], items: ["..."]}}`)
+- ✅ 9.1 — Manejo estructurado de errores: JSON inválido devuelve 400 con `{errors: {_body: ["Invalid JSON body"]}}`; violaciones de validación devuelven 400 con mensajes por campo
+
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker. **Nota: no ejecuta phpunit**, solo build y lint.
@@ -189,10 +195,8 @@ Configurá estos secrets en tu repo:
 ## Deuda técnica conocida
 
 1. **`float $total` para dinero**: Causa problemas de precisión en coma flotante. Necesita un value object Money.
-2. **Sin validación de entrada**: `OrderController::create()` no valida el JSON entrante. Faltan DTOs y Symfony Validator.
-3. **Sin manejo estructurado de errores**: Errores devuelven 500 genérico en vez de 400 con JSON de validación.
-4. **Condición de carrera en `processedBy`**: La columna JSON puede perder datos cuando múltiples handlers guardan concurrentemente (last write wins). La idempotencia individual funciona, pero `processedBy` no refleja todos los handlers que corrieron. Fix: optimistic locking o tabla `order_handler_status`.
-5. **CI sin tests**: El pipeline de CI solo hace build y lint, no ejecuta `phpunit`.
+2. **Condición de carrera en `processedBy`**: La columna JSON puede perder datos cuando múltiples handlers guardan concurrentemente (last write wins). La idempotencia individual funciona, pero `processedBy` no refleja todos los handlers que corrieron. Fix: optimistic locking o tabla `order_handler_status`.
+3. **CI sin tests**: El pipeline de CI solo hace build y lint, no ejecuta `phpunit`.
 
 ---
 
