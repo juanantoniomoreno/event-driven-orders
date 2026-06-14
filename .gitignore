@@ -19,3 +19,4 @@ backend/var/*.db
 backend/.env
 backend/.env.local
 backend/.env.*.local
+backend/vendor_old/

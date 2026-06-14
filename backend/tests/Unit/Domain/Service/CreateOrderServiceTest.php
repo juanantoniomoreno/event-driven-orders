@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Domain\Service;
 
+use App\Dto\CreateOrderRequest;
 use App\Domain\Entity\Order;
 use App\Domain\Service\CreateOrderService;
 use App\Domain\Service\OrderRepositoryInterface;
@@ -21,6 +22,12 @@ class CreateOrderServiceTest extends TestCase
 
         $service = new CreateOrderService($repository, $eventBus);
 
+        $request = new CreateOrderRequest(
+            customerEmail: 'customer@test.com',
+            items: ['sku-a', 'sku-b'],
+            total: 99.99,
+        );
+
         // Expect repository.save() to be called once with any Order
         $repository->expects($this->once())
             ->method('save')
@@ -37,7 +44,7 @@ class CreateOrderServiceTest extends TestCase
             }))
             ->willReturn(new Envelope(new \stdClass()));
 
-        $order = $service->execute('customer@test.com', ['sku-a', 'sku-b'], 99.99);
+        $order = $service->execute($request);
 
         $this->assertInstanceOf(Order::class, $order);
         $this->assertSame('customer@test.com', $order->getCustomerEmail());
@@ -55,7 +62,12 @@ class CreateOrderServiceTest extends TestCase
         $eventBus->expects($this->once())->method('dispatch')->willReturn(new Envelope(new \stdClass()));
 
         $service = new CreateOrderService($repository, $eventBus);
-        $order = $service->execute('test@test.com', [], 0.0);
+        $request = new CreateOrderRequest(
+            customerEmail: 'test@test.com',
+            items: ['item'],
+            total: 10.0,
+        );
+        $order = $service->execute($request);
 
         $this->assertNotEmpty($order->getId());
         $this->assertSame(16, strlen($order->getId()));
@@ -75,6 +87,11 @@ class CreateOrderServiceTest extends TestCase
             ->willReturn(new Envelope(new \stdClass()));
 
         $service = new CreateOrderService($repository, $eventBus);
-        $service->execute('id-test@test.com', ['item'], 10.0);
+        $request = new CreateOrderRequest(
+            customerEmail: 'id-test@test.com',
+            items: ['item'],
+            total: 10.0,
+        );
+        $service->execute($request);
     }
 }

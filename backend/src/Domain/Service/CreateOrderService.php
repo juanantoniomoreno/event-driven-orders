@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Service;
 
+use App\Dto\CreateOrderRequest;
 use App\Domain\Entity\Order;
 use App\Messaging\Message\OrderCreatedMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -15,9 +16,13 @@ class CreateOrderService
         private MessageBusInterface $eventBus
     ) {}
 
-    public function execute(string $email, array $items, float $total): Order
+    public function execute(CreateOrderRequest $request): Order
     {
-        $order = new Order($email, $items, $total);
+        $order = new Order(
+            $request->customerEmail,
+            $request->items,
+            $request->total,
+        );
         $this->repository->save($order);
 
         $this->eventBus->dispatch(new OrderCreatedMessage(
