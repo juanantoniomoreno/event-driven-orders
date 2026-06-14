@@ -1,12 +1,10 @@
-strict_tdd: false
+strict_tdd: true
 context: |
-  event-driven-orders-frontend is a Node.js/TypeScript ESM, React project.
-  Detected markers: frontend/package.json, frontend/npm package manager, GitHub Actions.
-  Package managers: npm.
-  No reliable test runner was detected; verify testing manually before enabling strict TDD.
-  Unit tests: none.
-  Integration tests: none.
-  E2E tests: none.
+  Event-driven order management API. Symfony 7 + PHP 8.2 backend with Doctrine ORM,
+  Messenger (AMQP) to RabbitMQ, 3 specialized workers, Mercure SSE real-time updates,
+  PostgreSQL 16, React 18 + Vite frontend, Docker Compose (9 services), GitHub Actions CI/CD.
+  Convention: PHP strict_types, constructor injection, YAML routing, repository interfaces.
+detected: "2026-06-14"
 rules:
   proposal:
     require_problem_statement: true
@@ -17,36 +15,47 @@ rules:
   tasks:
     protect_review_workload: true
   apply:
-    test_command: ""
+    test_command: "cd backend && php vendor/bin/phpunit"
   verify:
-    test_command: ""
+    test_command: "cd backend && php vendor/bin/phpunit"
 testing:
-  detected: "2026-05-31"
+  detected: "2026-06-14"
   runner:
-    command: ""
-    framework: ""
+    - framework: PHPUnit 13.1
+      command: "cd backend && php vendor/bin/phpunit"
+      layers: [unit, integration, functional]
+    - framework: Playwright 1.60
+      command: "cd frontend && npx playwright test"
+      layers: [e2e]
   layers:
-    unit: ""
-    integration: ""
-    e2e: ""
+    unit:
+      - tool: PHPUnit
+        path: backend/tests/Unit/
+        count: 3
+    integration:
+      - tool: PHPUnit
+        path: backend/tests/Integration/
+        count: 3
+    functional:
+      - tool: PHPUnit
+        path: backend/tests/Functional/
+        count: 1
+    e2e:
+      - tool: Playwright
+        path: frontend/tests/e2e/
+        count: 2
   commands:
     unit:
-      []
+      - "cd backend && php vendor/bin/phpunit tests/Unit"
     integration:
-      []
+      - "cd backend && php vendor/bin/phpunit tests/Integration"
+    functional:
+      - "cd backend && php vendor/bin/phpunit tests/Functional"
     e2e:
-      []
+      - "cd frontend && npx playwright test"
   coverage:
     command: ""
-    commands:
-      []
 quality:
   lint: ""
-  lint_commands:
-    []
   typecheck: ""
-  typecheck_commands:
-    []
   format: ""
-  format_commands:
-    []

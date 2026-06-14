@@ -114,20 +114,161 @@ class OrderControllerTest extends WebTestCase
         $this->assertSame('Order not found', $data['error']);
     }
 
-    public function testCreateOrderWithEmptyBodyDoesNotCrash(): void
+    public function testCreateOrderWithEmptyBodyReturns400(): void
     {
         $client = static::createClient();
 
-        // The controller uses null-coalescing defaults: email='', items=[], total=0.0
+        // An empty JSON object has no required fields — validation must reject it
         $client->request('POST', '/api/orders', server: [
             'CONTENT_TYPE' => 'application/json',
         ], content: '{}');
 
-        $this->assertResponseStatusCodeSame(201);
+        $this->assertResponseStatusCodeSame(400);
         $data = json_decode($client->getResponse()->getContent(), true);
-        $this->assertSame('', $data['customerEmail']);
-        $this->assertSame([], $data['items']);
-        $this->assertSame(0.0, (float) $data['total']);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('customerEmail', $data['errors']);
+        $this->assertArrayHasKey('items', $data['errors']);
+        $this->assertArrayHasKey('total', $data['errors']);
+    }
+
+    public function testCreateOrderWithEmptyEmailReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => '',
+            'items' => ['widget'],
+            'total' => 9.99,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('customerEmail', $data['errors']);
+    }
+
+    public function testCreateOrderWithInvalidEmailReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => 'not-an-email',
+            'items' => ['widget'],
+            'total' => 9.99,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('customerEmail', $data['errors']);
+    }
+
+    public function testCreateOrderWithEmptyItemsReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => 'test@example.com',
+            'items' => [],
+            'total' => 9.99,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('items', $data['errors']);
+    }
+
+    public function testCreateOrderWithMissingItemsReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => 'test@example.com',
+            'total' => 9.99,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('items', $data['errors']);
+    }
+
+    public function testCreateOrderWithZeroTotalReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => 'test@example.com',
+            'items' => ['widget'],
+            'total' => 0,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('total', $data['errors']);
+    }
+
+    public function testCreateOrderWithNegativeTotalReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => 'test@example.com',
+            'items' => ['widget'],
+            'total' => -5.00,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('total', $data['errors']);
+    }
+
+    public function testCreateOrderWithMultipleValidationErrorsReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: json_encode([
+            'customerEmail' => '',
+            'items' => [],
+            'total' => 0,
+        ]));
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('customerEmail', $data['errors']);
+        $this->assertArrayHasKey('items', $data['errors']);
+        $this->assertArrayHasKey('total', $data['errors']);
+    }
+
+    public function testCreateOrderWithMalformedJsonReturns400(): void
+    {
+        $client = static::createClient();
+
+        $client->request('POST', '/api/orders', server: [
+            'CONTENT_TYPE' => 'application/json',
+        ], content: 'not json');
+
+        $this->assertResponseStatusCodeSame(400);
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
     }
 
     public function testOrderStatusIsProcessedAfterSyncHandlers(): void
