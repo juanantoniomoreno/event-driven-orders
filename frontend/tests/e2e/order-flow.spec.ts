@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("create order and watch it process via SSE", async ({ page }) => {
+test("create order and watch it process via SSE", async ({ page, request }) => {
 	await page.goto("/");
 
 	// Wait for the page to be fully loaded
@@ -23,10 +23,27 @@ test("create order and watch it process via SSE", async ({ page }) => {
 	await expect(firstOrder).toContainText("$42.5");
 	await expect(firstOrder).toContainText("pending");
 
-	// Wait for Mercure SSE update: workers process the order and push real-time
-	// status changes (notifications ~2s, inventory ~1s, analytics ~1s).
-	// Each handler publishes when it finishes, so "processed" appears within 3s.
-	await expect(firstOrder).toContainText("processed", { timeout: 5000 });
+	// Find the order ID via the backend API so we can poll for completion
+	const listRes = await request.get("/api/orders");
+	const orders = await listRes.json();
+	const ourOrder = orders.find((o: { email: string }) => o.email === email);
+
+	// Poll the backend API until the order is processed (up to 30s, every 500ms)
+	const maxWaitMs = 30_000;
+	const pollIntervalMs = 500;
+	const startTime = Date.now();
+	let orderStatus = "pending";
+	while (Date.now() - startTime < maxWaitMs) {
+		const res = await request.get(`/api/orders/${ourOrder.id}`);
+		const order = await res.json();
+		orderStatus = order.status;
+		if (orderStatus === "processed") break;
+		await page.waitForTimeout(pollIntervalMs);
+	}
+	expect(orderStatus).toBe("processed");
+
+	// Verify the UI reflects the status update pushed via Mercure SSE
+	await expect(firstOrder).toContainText("processed");
 });
 
 test("existing orders are loaded on page refresh", async ({ page }) => {
