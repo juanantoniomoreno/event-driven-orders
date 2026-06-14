@@ -32,22 +32,19 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - name: Create test database directory
-        run: mkdir -p var
-
       - name: Warm up test cache
         run: php bin/console cache:clear --env=test
 
       - name: Create test database schema
         env:
           APP_ENV: test
-          DATABASE_URL: "sqlite://${{ github.workspace }}/backend/var/data_test.db"
+          DATABASE_URL: "sqlite:///tmp/event-driven-orders-test.db"
         run: php bin/console doctrine:schema:create --env=test
 
       - name: Run PHPUnit
         env:
           APP_ENV: test
-          DATABASE_URL: "sqlite://${{ github.workspace }}/backend/var/data_test.db"
+          DATABASE_URL: "sqlite:///tmp/event-driven-orders-test.db"
         run: php vendor/bin/phpunit
 
   frontend:
