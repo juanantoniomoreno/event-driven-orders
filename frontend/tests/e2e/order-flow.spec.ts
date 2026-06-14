@@ -26,7 +26,9 @@ test("create order and watch it process via SSE", async ({ page, request }) => {
 	// Find the order ID via the backend API so we can poll for completion
 	const listRes = await request.get("/api/orders");
 	const orders = await listRes.json();
-	const ourOrder = orders.find((o: { email: string }) => o.email === email);
+	const ourOrder = orders.find(
+		(o: { customerEmail: string }) => o.customerEmail === email,
+	);
 
 	// Poll the backend API until the order is processed (up to 30s, every 500ms)
 	const maxWaitMs = 30_000;
