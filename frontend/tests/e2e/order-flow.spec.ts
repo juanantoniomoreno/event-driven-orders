@@ -4,7 +4,7 @@ test("create order and watch it process via SSE", async ({ page, request }) => {
 	await page.goto("/");
 
 	// Wait for the page to be fully loaded
-	await expect(page.locator("h1")).toHaveText("Event-Driven Orders");
+	await expect(page.locator("h1")).toHaveText("EVENT-DRIVEN-ORDERS");
 
 	// Fill in the order form
 	const email = `e2e-${Date.now()}@test.com`;
@@ -53,7 +53,7 @@ test("existing orders are loaded on page refresh", async ({ page }) => {
 	await page.goto("/");
 
 	// The page should load and display the <h1> title
-	await expect(page.locator("h1")).toHaveText("Event-Driven Orders");
+	await expect(page.locator("h1")).toHaveText("EVENT-DRIVEN-ORDERS");
 
 	// The order list should exist (may be empty or contain existing orders)
 	const orderList = page.locator("ul");
