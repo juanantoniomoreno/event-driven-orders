@@ -145,7 +145,7 @@ jobs:
       - name: Wait for Mercure hub
         run: |
           echo "Waiting for Mercure hub..."
-          timeout 30 bash -c 'until curl -sf -o /dev/null http://localhost:3001/.well-known/mercure; do sleep 2; done'
+          timeout 30 bash -c 'until curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/.well-known/mercure | grep -qE "^(200|401)$"; do sleep 2; done'
           echo "Mercure hub is ready."
 
       - name: Setup Node
