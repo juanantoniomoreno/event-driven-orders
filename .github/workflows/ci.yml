@@ -12,6 +12,25 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      mercure:
+        image: dunglas/mercure
+        ports:
+          - 3001:80
+        env:
+          SERVER_NAME: ":80"
+          MERCURE_PUBLISHER_JWT_KEY: test_secret_key_for_testing_only
+          MERCURE_SUBSCRIBER_JWT_KEY: test_secret_key_for_testing_only
+          MERCURE_EXTRA_DIRECTIVES: |
+            cors_origins *
+            publish_origins *
+            publish
+            subscribe
+        options: >-
+          --health-cmd "curl -s -o /dev/null -w '%{http_code}' http://localhost:80/.well-known/mercure | grep -qE '^(200|401)$'"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v4
 
@@ -19,13 +38,33 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: redis, amqp
+          extensions: pdo_sqlite, sqlite3, amqp, redis
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - name: Lint
-        run: php bin/console cache:clear --env=test || true
+      - name: Warm up test cache
+        run: php bin/console cache:clear --env=test
+
+      - name: Create test database schema
+        run: |
+          export APP_ENV=test
+          export DATABASE_URL="sqlite:////tmp/event-driven-orders-test.db"
+          php bin/console doctrine:schema:create --env=test
+
+      - name: Run PHPUnit
+        run: |
+          export APP_ENV=test
+          export DATABASE_URL="sqlite:////tmp/event-driven-orders-test.db"
+          php vendor/bin/phpunit
 
   frontend:
     runs-on: ubuntu-latest
@@ -47,6 +86,103 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for Docker Compose
+        run: |
+          cat > .env << 'EOF'
+          MERCURE_JWT_SECRET=ci_test_jwt_secret_0123456789abcdef0123456789abcdef
+          RABBITMQ_USER=guest
+          RABBITMQ_PASS=guest
+          POSTGRES_USER=orders
+          POSTGRES_PASSWORD=orders
+          POSTGRES_DB=orders
+          EOF
+
+      - name: Install PHP dependencies for volume mount
+        run: |
+          docker run --rm -v "$(pwd)/backend:/app" -w /app composer:latest \
+            composer install --no-interaction --prefer-dist --ignore-platform-req=ext-amqp
+
+      - name: Build and start Docker stack
+        run: |
+          set -e
+          docker compose up -d --build
+          echo "Docker stack status:"
+          docker compose ps
+
+      - name: Wait for backend API
+        run: |
+          echo "Waiting for backend API to be ready..."
+          if timeout 180 bash -c 'until curl -sf -o /dev/null http://localhost:8080/api/orders; do sleep 3; done'; then
+            echo "Backend API is ready."
+          else
+            echo "Backend API did not become ready within 180s."
+            echo "--- docker compose ps ---"
+            docker compose ps
+            echo "--- docker compose logs (last 150 lines) ---"
+            docker compose logs --tail 150
+            exit 1
+          fi
+
+      - name: Wait for frontend
+        run: |
+          echo "Waiting for frontend to be ready..."
+          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000; do sleep 2; done'
+          echo "Frontend is ready."
+
+      - name: Wait for RabbitMQ management API
+        run: |
+          echo "Waiting for RabbitMQ management API..."
+          timeout 60 bash -c 'until curl -sf -u guest:guest -o /dev/null http://localhost:15673/api/overview; do sleep 2; done'
+          echo "RabbitMQ management API is ready."
+
+      - name: Wait for Mercure hub
+        run: |
+          echo "Waiting for Mercure hub..."
+          timeout 30 bash -c 'until curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/.well-known/mercure | grep -qE "^(200|401)$"; do sleep 2; done'
+          echo "Mercure hub is ready."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies and Playwright browsers
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Truncate orders table before E2E run
+        run: docker exec edo_postgres psql -U orders -d orders -c "TRUNCATE orders CASCADE;"
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        run: npx playwright test
+
+      - name: Collect Docker logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Stop Docker stack
+        if: always()
+        run: docker compose down -v
 
   docker:
     runs-on: ubuntu-latest
