@@ -26,3 +26,6 @@ frontend/test-results/
 
 # SDD artifacts (if using file-based mode)
 sdd/
+
+# TLS certificates (generate locally, never commit)
+certs/
