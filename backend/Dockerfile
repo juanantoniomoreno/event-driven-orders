@@ -13,7 +13,7 @@ RUN apk add --no-cache \
     postgresql-dev \
     && pecl install amqp \
     && docker-php-ext-enable amqp \
-    && docker-php-ext-install pdo pdo_pgsql opcache \
+    && docker-php-ext-install pdo pdo_pgsql opcache bcmath \
     && apk del $PHPIZE_DEPS postgresql-dev rabbitmq-c-dev
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

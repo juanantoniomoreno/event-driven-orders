@@ -18,8 +18,8 @@ class CreateOrderRequest
         public ?array $items = null,
 
         #[Assert\NotNull(message: 'This value should not be null.')]
-        #[Assert\GreaterThan(0, message: 'This value should be greater than 0.')]
-        public ?float $total = null,
+        #[Assert\Valid]
+        public ?MoneyInput $total = null,
     ) {
     }
 }

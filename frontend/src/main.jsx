@@ -83,7 +83,7 @@ function App() {
 			body: JSON.stringify({
 				customerEmail: email,
 				items: items.split(",").map((s) => s.trim()),
-				total: parseFloat(total),
+				total: { amount: Math.round(parseFloat(total) * 100), currency: "USD" },
 			}),
 		});
 		const newOrder = await res.json();
@@ -128,7 +128,7 @@ function App() {
 			<ul>
 				{orders.map((o) => (
 					<li key={o.id}>
-						<strong>{o.id}</strong> — {o.customerEmail} — ${o.total} —{" "}
+						<strong>{o.id}</strong> — {o.customerEmail} — ${(o.total.amount / 100).toFixed(2)} —{" "}
 						<em>{o.status}</em>
 					</li>
 				))}

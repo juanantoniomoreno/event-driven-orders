@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Domain\Service;
 
 use App\Dto\CreateOrderRequest;
+use App\Dto\MoneyInput;
 use App\Domain\Entity\Order;
 use App\Domain\Service\CreateOrderService;
 use App\Domain\Service\OrderRepositoryInterface;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use App\Messaging\Message\OrderCreatedMessage;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
@@ -25,7 +27,7 @@ class CreateOrderServiceTest extends TestCase
         $request = new CreateOrderRequest(
             customerEmail: 'customer@test.com',
             items: ['sku-a', 'sku-b'],
-            total: 99.99,
+            total: new MoneyInput(9999, 'USD'),
         );
 
         // Expect repository.save() to be called once with any Order
@@ -39,7 +41,8 @@ class CreateOrderServiceTest extends TestCase
             ->with($this->callback(function ($message) {
                 return $message instanceof OrderCreatedMessage
                     && $message->getCustomerEmail() === 'customer@test.com'
-                    && $message->getTotal() === 99.99
+                    && $message->getTotal()->getAmount() === 9999
+                    && $message->getTotal()->getCurrency() === 'USD'
                     && $message->getItems() === ['sku-a', 'sku-b'];
             }))
             ->willReturn(new Envelope(new \stdClass()));
@@ -49,7 +52,8 @@ class CreateOrderServiceTest extends TestCase
         $this->assertInstanceOf(Order::class, $order);
         $this->assertSame('customer@test.com', $order->getCustomerEmail());
         $this->assertSame(['sku-a', 'sku-b'], $order->getItems());
-        $this->assertSame(99.99, $order->getTotal());
+        $this->assertSame(9999, $order->getTotal()->getAmount());
+        $this->assertSame('USD', $order->getTotal()->getCurrency());
         $this->assertSame('pending', $order->getStatus());
     }
 
@@ -65,7 +69,7 @@ class CreateOrderServiceTest extends TestCase
         $request = new CreateOrderRequest(
             customerEmail: 'test@test.com',
             items: ['item'],
-            total: 10.0,
+            total: new MoneyInput(1000, 'USD'),
         );
         $order = $service->execute($request);
 
@@ -90,7 +94,7 @@ class CreateOrderServiceTest extends TestCase
         $request = new CreateOrderRequest(
             customerEmail: 'id-test@test.com',
             items: ['item'],
-            total: 10.0,
+            total: new MoneyInput(1000, 'USD'),
         );
         $service->execute($request);
     }

@@ -20,8 +20,8 @@ test("create order and watch it process via SSE", async ({ page, request }) => {
 	// Locate by unique email so stale orders from retries don't break assertions
 	const orderRow = page.locator("li", { hasText: email });
 	await expect(orderRow).toContainText(email);
-	// JS parseFloat strips the trailing zero: 42.50 → 42.5
-	await expect(orderRow).toContainText("$42.5");
+	// Money format: $X.XX (cents divided by 100, formatted to 2 decimal places)
+	await expect(orderRow).toContainText("$42.50");
 	await expect(orderRow).toContainText("pending");
 
 	// Find the order ID via the backend API so we can poll for completion

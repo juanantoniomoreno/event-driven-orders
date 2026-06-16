@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Domain\Service;
 
 use App\Domain\Entity\Order;
 use App\Domain\Service\DoctrineOrderRepository;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -28,7 +29,7 @@ class DoctrineOrderRepositoryTest extends KernelTestCase
             id: '550e8400e29b41d4',
             customerEmail: 'integration@test.com',
             items: ['laptop', 'mouse'],
-            total: 1499.98,
+            total: MoneyEmbeddable::ofUSD(149998),
             status: 'pending',
             createdAt: new \DateTimeImmutable('2026-06-01'),
         );
@@ -44,8 +45,34 @@ class DoctrineOrderRepositoryTest extends KernelTestCase
         $this->assertSame('550e8400e29b41d4', $found->getId());
         $this->assertSame('integration@test.com', $found->getCustomerEmail());
         $this->assertSame(['laptop', 'mouse'], $found->getItems());
-        $this->assertSame(1499.98, $found->getTotal());
+        $this->assertSame(149998, $found->getTotal()->getAmount());
+        $this->assertSame('USD', $found->getTotal()->getCurrency());
         $this->assertSame('pending', $found->getStatus());
+    }
+
+    public function testMoneyEmbeddablePersistAndLoadRoundTrip(): void
+    {
+        // ARRANGE — verify BIGINT persistence with real DB
+        $order = Order::reconstruct(
+            id: 'moneyrt000001tes',
+            customerEmail: 'roundtrip@test.com',
+            items: ['sku-x'],
+            total: MoneyEmbeddable::ofUSD(4250),
+            status: 'pending',
+            createdAt: new \DateTimeImmutable(),
+        );
+
+        // ACT
+        $this->repository->save($order);
+        $this->entityManager->clear();
+
+        $found = $this->repository->find('moneyrt000001tes');
+
+        // ASSERT — MoneyEmbeddable survives persist/load round-trip
+        $this->assertNotNull($found);
+        $this->assertSame(4250, $found->getTotal()->getAmount());
+        $this->assertSame('USD', $found->getTotal()->getCurrency());
+        $this->assertSame(['amount' => 4250, 'currency' => 'USD'], $found->getTotal()->toArray());
     }
 
     public function testFindReturnsNullForNonExistentId(): void
@@ -61,7 +88,7 @@ class DoctrineOrderRepositoryTest extends KernelTestCase
             id: 'older00000000001',
             customerEmail: 'older@test.com',
             items: ['item-a'],
-            total: 10.0,
+            total: MoneyEmbeddable::ofUSD(1000),
             status: 'processed',
             createdAt: new \DateTimeImmutable('2026-01-01'),
         );
@@ -69,7 +96,7 @@ class DoctrineOrderRepositoryTest extends KernelTestCase
             id: 'newer00000000001',
             customerEmail: 'newer@test.com',
             items: ['item-b'],
-            total: 20.0,
+            total: MoneyEmbeddable::ofUSD(2000),
             status: 'pending',
             createdAt: new \DateTimeImmutable('2026-06-01'),
         );
@@ -100,7 +127,7 @@ class DoctrineOrderRepositoryTest extends KernelTestCase
             id: 'update-me-id',
             customerEmail: 'before@test.com',
             items: ['old-item'],
-            total: 42.0,
+            total: MoneyEmbeddable::ofUSD(4200),
             status: 'pending',
             createdAt: new \DateTimeImmutable(),
         );

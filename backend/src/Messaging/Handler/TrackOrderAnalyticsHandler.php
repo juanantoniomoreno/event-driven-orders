@@ -24,7 +24,7 @@ class TrackOrderAnalyticsHandler extends AbstractOrderHandler
     {
         $this->logger->info('[ANALYTICS] Tracking order metrics', [
             'orderId' => $message->getOrderId(),
-            'total' => $message->getTotal(),
+            'total' => $message->getTotal()->getAmount() . ' ' . $message->getTotal()->getCurrency(),
             'itemCount' => count($message->getItems()),
         ]);
     }

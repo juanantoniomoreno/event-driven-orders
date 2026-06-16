@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Domain\Service\CreateOrderService;
 use App\Domain\Service\OrderRepositoryInterface;
 use App\Dto\CreateOrderRequest;
+use App\Dto\MoneyInput;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,10 +33,27 @@ class OrderController
             );
         }
 
+        // Build MoneyInput from nested total object; reject flat scalar
+        $totalData = $data['total'] ?? null;
+        if ($totalData !== null && !is_array($totalData)) {
+            return new JsonResponse(
+                ['errors' => ['total' => ['Total must be an object with amount and currency.']]],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        $moneyInput = null;
+        if (is_array($totalData)) {
+            $moneyInput = new MoneyInput(
+                amount: array_key_exists('amount', $totalData) ? (int) $totalData['amount'] : null,
+                currency: array_key_exists('currency', $totalData) ? (string) $totalData['currency'] : null,
+            );
+        }
+
         $dto = new CreateOrderRequest(
             $data['customerEmail'] ?? null,
             $data['items'] ?? null,
-            $data['total'] ?? null,
+            $moneyInput,
         );
 
         $violations = $this->validator->validate($dto);

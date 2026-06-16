@@ -15,3 +15,8 @@ doctrine:
                 dir: "%kernel.project_dir%/src/Domain/Entity"
                 prefix: 'App\Domain\Entity'
                 alias: App
+            ValueObject:
+                is_bundle: false
+                type: attribute
+                dir: "%kernel.project_dir%/src/Domain/ValueObject"
+                prefix: 'App\Domain\ValueObject'

@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Messaging\Handler;
 
 use App\Domain\Entity\Order;
 use App\Domain\Service\DoctrineOrderRepository;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use App\Messaging\Handler\UpdateInventoryHandler;
 use App\Messaging\Message\OrderCreatedMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,7 +46,7 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
             id: 'invtryOrder00001',
             customerEmail: 'warehouse@example.com',
             items: ['sku-123', 'sku-456', 'sku-789'],
-            total: 275.50,
+            total: MoneyEmbeddable::ofUSD(27550),
             status: 'pending',
             createdAt: new \DateTimeImmutable(),
         );
@@ -63,7 +64,7 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
                     && $data['processedBy'] === 'inventory';
             }));
 
-        $message = new OrderCreatedMessage('invtryOrder00001', 'warehouse@example.com', 275.50, ['sku-123', 'sku-456', 'sku-789']);
+        $message = new OrderCreatedMessage('invtryOrder00001', 'warehouse@example.com', MoneyEmbeddable::ofUSD(27550), ['sku-123', 'sku-456', 'sku-789']);
 
         // ACT
         $this->handler->__invoke($message);
@@ -84,7 +85,7 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
             id: 'skipInvtry00001',
             customerEmail: 'done@example.com',
             items: ['bolt'],
-            total: 1.50,
+            total: MoneyEmbeddable::ofUSD(150),
             status: 'processed',
             createdAt: new \DateTimeImmutable(),
             processedBy: ['notifications', 'inventory'],
@@ -97,7 +98,7 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
         $this->hub->expects($this->never())->method('publish');
         $this->logger->expects($this->any())->method('info');
 
-        $message = new OrderCreatedMessage('skipInvtry00001', 'done@example.com', 1.50, ['bolt']);
+        $message = new OrderCreatedMessage('skipInvtry00001', 'done@example.com', MoneyEmbeddable::ofUSD(150), ['bolt']);
 
         // ACT
         $this->handler->__invoke($message);
@@ -120,7 +121,7 @@ class UpdateInventoryHandlerIntegrationTest extends KernelTestCase
         $this->hub->expects($this->never())->method('publish');
         $this->logger->expects($this->any())->method('info');
 
-        $message = new OrderCreatedMessage('ghostInvtry00001', 'nobody@example.com', 0.0, []);
+        $message = new OrderCreatedMessage('ghostInvtry00001', 'nobody@example.com', MoneyEmbeddable::ofUSD(100), []);
 
         // ACT
         $this->handler->__invoke($message);

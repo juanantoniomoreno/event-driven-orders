@@ -107,7 +107,7 @@ jobs:
       - name: Install PHP dependencies for volume mount
         run: |
           docker run --rm -v "$(pwd)/backend:/app" -w /app composer:latest \
-            composer install --no-interaction --prefer-dist --ignore-platform-req=ext-amqp
+            composer install --no-interaction --prefer-dist --ignore-platform-req=ext-amqp --ignore-platform-req=ext-bcmath
 
       - name: Build and start Docker stack
         run: |
