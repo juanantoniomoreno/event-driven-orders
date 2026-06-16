@@ -6,6 +6,7 @@ namespace App\Domain\Service;
 
 use App\Dto\CreateOrderRequest;
 use App\Domain\Entity\Order;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use App\Messaging\Message\OrderCreatedMessage;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -18,10 +19,12 @@ class CreateOrderService
 
     public function execute(CreateOrderRequest $request): Order
     {
+        $total = MoneyEmbeddable::ofUSD($request->total->amount);
+
         $order = new Order(
             $request->customerEmail,
             $request->items,
-            $request->total,
+            $total,
         );
         $this->repository->save($order);
 

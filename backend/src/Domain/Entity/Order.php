@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
+use App\Domain\ValueObject\MoneyEmbeddable;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
@@ -20,8 +21,8 @@ class Order
     #[ORM\Column(type: 'json')]
     private array $items;
 
-    #[ORM\Column(type: 'float')]
-    private float $total;
+    #[ORM\Embedded(class: MoneyEmbeddable::class, columnPrefix: false)]
+    private MoneyEmbeddable $total;
 
     #[ORM\Column(type: 'string', length: 20)]
     private string $status;
@@ -35,7 +36,7 @@ class Order
     public function __construct(
         string $customerEmail,
         array $items,
-        float $total
+        MoneyEmbeddable $total
     ) {
         $this->id = bin2hex(random_bytes(8));
         $this->customerEmail = $customerEmail;
@@ -50,7 +51,7 @@ class Order
         string $id,
         string $customerEmail,
         array $items,
-        float $total,
+        MoneyEmbeddable $total,
         string $status,
         \DateTimeImmutable $createdAt,
         array $processedBy = []
@@ -66,7 +67,7 @@ class Order
     public function getId(): string { return $this->id; }
     public function getCustomerEmail(): string { return $this->customerEmail; }
     public function getItems(): array { return $this->items; }
-    public function getTotal(): float { return $this->total; }
+    public function getTotal(): MoneyEmbeddable { return $this->total; }
     public function getStatus(): string { return $this->status; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getProcessedBy(): array { return $this->processedBy; }
@@ -100,7 +101,7 @@ class Order
             'id' => $this->id,
             'customerEmail' => $this->customerEmail,
             'items' => $this->items,
-            'total' => $this->total,
+            'total' => $this->total->toArray(),
             'status' => $this->status,
             'processedBy' => $this->processedBy,
             'createdAt' => $this->createdAt->format('c'),

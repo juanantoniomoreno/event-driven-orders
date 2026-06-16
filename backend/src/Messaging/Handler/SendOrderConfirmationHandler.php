@@ -25,7 +25,7 @@ class SendOrderConfirmationHandler extends AbstractOrderHandler
         $this->logger->info('[NOTIFICATIONS] Sending order confirmation email', [
             'orderId' => $message->getOrderId(),
             'email' => $message->getCustomerEmail(),
-            'total' => $message->getTotal(),
+            'total' => $message->getTotal()->getAmount() . ' ' . $message->getTotal()->getCurrency(),
         ]);
     }
 

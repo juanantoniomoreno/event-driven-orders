@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Messaging\Handler;
 
 use App\Domain\Entity\Order;
 use App\Domain\Service\DoctrineOrderRepository;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use App\Messaging\Handler\SendOrderConfirmationHandler;
 use App\Messaging\Message\OrderCreatedMessage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,7 +46,7 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
             id: 'notifOrder000001',
             customerEmail: 'customer@example.com',
             items: ['keyboard', 'monitor'],
-            total: 349.99,
+            total: MoneyEmbeddable::ofUSD(34999),
             status: 'pending',
             createdAt: new \DateTimeImmutable(),
         );
@@ -54,8 +55,6 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
         $this->entityManager->clear();
 
         $this->logger->expects($this->any())->method('info');
-        // Mercure should not be called in test (no real publishing), but if the
-        // handler reaches that point, mock it to avoid errors
         $this->hub->expects($this->once())
             ->method('publish')
             ->with($this->callback(function (Update $update) {
@@ -64,7 +63,7 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
                     && $data['status'] === 'processed';
             }));
 
-        $message = new OrderCreatedMessage('notifOrder000001', 'customer@example.com', 349.99, ['keyboard', 'monitor']);
+        $message = new OrderCreatedMessage('notifOrder000001', 'customer@example.com', MoneyEmbeddable::ofUSD(34999), ['keyboard', 'monitor']);
 
         // ACT: invoke the handler directly
         $this->handler->__invoke($message);
@@ -85,7 +84,7 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
             id: 'skipNotif000001',
             customerEmail: 'already@example.com',
             items: ['widget'],
-            total: 9.99,
+            total: MoneyEmbeddable::ofUSD(999),
             status: 'processed',
             createdAt: new \DateTimeImmutable(),
             processedBy: ['notifications'],
@@ -96,10 +95,9 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
 
         // Mercure should NOT be called — handler should skip
         $this->hub->expects($this->never())->method('publish');
-        // But idempotency skip should be logged
         $this->logger->expects($this->any())->method('info');
 
-        $message = new OrderCreatedMessage('skipNotif000001', 'already@example.com', 9.99, ['widget']);
+        $message = new OrderCreatedMessage('skipNotif000001', 'already@example.com', MoneyEmbeddable::ofUSD(999), ['widget']);
 
         // ACT
         $this->handler->__invoke($message);
@@ -119,11 +117,10 @@ class SendOrderConfirmationHandlerIntegrationTest extends KernelTestCase
     public function testHandlerDoesNothingWhenOrderNotFound(): void
     {
         // ARRANGE: NO order in DB
-        // We don't expect Mercure to be called since there's no order to update
         $this->hub->expects($this->never())->method('publish');
         $this->logger->expects($this->any())->method('info');
 
-        $message = new OrderCreatedMessage('nonexistent-order', 'ghost@example.com', 0.0, []);
+        $message = new OrderCreatedMessage('nonexistent-order', 'ghost@example.com', MoneyEmbeddable::ofUSD(100), []);
 
         // ACT: this should NOT throw
         $this->handler->__invoke($message);

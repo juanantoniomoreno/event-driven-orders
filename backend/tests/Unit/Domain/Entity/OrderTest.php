@@ -5,26 +5,30 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Domain\Entity;
 
 use App\Domain\Entity\Order;
+use App\Domain\ValueObject\MoneyEmbeddable;
 use PHPUnit\Framework\TestCase;
 
 class OrderTest extends TestCase
 {
-    public function testConstructorCreatesOrderWithDefaults(): void
+    public function testConstructorCreatesOrderWithMoneyEmbeddable(): void
     {
-        $order = new Order('test@example.com', ['item1'], 99.99);
+        $total = MoneyEmbeddable::ofUSD(89999);
+        $order = new Order('test@example.com', ['item1'], $total);
 
         $this->assertMatchesRegularExpression('/^[0-9a-f]{16}$/', $order->getId());
         $this->assertSame('test@example.com', $order->getCustomerEmail());
         $this->assertSame(['item1'], $order->getItems());
-        $this->assertSame(99.99, $order->getTotal());
+        $this->assertInstanceOf(MoneyEmbeddable::class, $order->getTotal());
+        $this->assertSame(89999, $order->getTotal()->getAmount());
+        $this->assertSame('USD', $order->getTotal()->getCurrency());
         $this->assertSame('pending', $order->getStatus());
         $this->assertInstanceOf(\DateTimeImmutable::class, $order->getCreatedAt());
     }
 
     public function testIdIsRandomHex16(): void
     {
-        $order1 = new Order('a@b.com', [], 0.0);
-        $order2 = new Order('a@b.com', [], 0.0);
+        $order1 = new Order('a@b.com', [], MoneyEmbeddable::ofUSD(100));
+        $order2 = new Order('a@b.com', [], MoneyEmbeddable::ofUSD(100));
 
         $this->assertNotSame($order1->getId(), $order2->getId());
         $this->assertSame(16, strlen($order1->getId()));
@@ -33,7 +37,7 @@ class OrderTest extends TestCase
 
     public function testMarkAsProcessedChangesStatus(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
         $this->assertSame('pending', $order->getStatus());
 
         $order->markAsProcessed();
@@ -42,22 +46,23 @@ class OrderTest extends TestCase
 
     public function testMarkAsProcessedIsIdempotent(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
         $order->markAsProcessed();
         $order->markAsProcessed();
 
         $this->assertSame('processed', $order->getStatus());
     }
 
-    public function testReconstructRestoresOrder(): void
+    public function testReconstructRestoresOrderWithMoney(): void
     {
         $createdAt = new \DateTimeImmutable('2025-06-01T12:00:00+00:00');
+        $total = MoneyEmbeddable::ofUSD(15050);
 
         $order = Order::reconstruct(
             'abc123def4567890',
             'restored@example.com',
             ['item-a', 'item-b'],
-            150.50,
+            $total,
             'shipped',
             $createdAt
         );
@@ -65,14 +70,16 @@ class OrderTest extends TestCase
         $this->assertSame('abc123def4567890', $order->getId());
         $this->assertSame('restored@example.com', $order->getCustomerEmail());
         $this->assertSame(['item-a', 'item-b'], $order->getItems());
-        $this->assertSame(150.50, $order->getTotal());
+        $this->assertSame(15050, $order->getTotal()->getAmount());
+        $this->assertSame('USD', $order->getTotal()->getCurrency());
         $this->assertSame('shipped', $order->getStatus());
         $this->assertSame($createdAt, $order->getCreatedAt());
     }
 
-    public function testToArrayReturnsAllFields(): void
+    public function testToArrayReturnsAllFieldsWithNestedMoney(): void
     {
-        $order = new Order('array@test.com', ['sku-1'], 25.00);
+        $total = MoneyEmbeddable::ofUSD(2500);
+        $order = new Order('array@test.com', ['sku-1'], $total);
         $array = $order->toArray();
 
         $this->assertIsArray($array);
@@ -87,7 +94,7 @@ class OrderTest extends TestCase
         $this->assertSame($order->getId(), $array['id']);
         $this->assertSame('array@test.com', $array['customerEmail']);
         $this->assertSame(['sku-1'], $array['items']);
-        $this->assertSame(25.00, $array['total']);
+        $this->assertSame(['amount' => 2500, 'currency' => 'USD'], $array['total']);
         $this->assertSame('pending', $array['status']);
         $this->assertSame([], $array['processedBy']);
         $this->assertMatchesRegularExpression(
@@ -98,14 +105,14 @@ class OrderTest extends TestCase
 
     public function testGetProcessedByEmptyByDefault(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
 
         $this->assertSame([], $order->getProcessedBy());
     }
 
     public function testIsProcessedByReturnsFalseWhenNotProcessed(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
 
         $this->assertFalse($order->isProcessedBy('notifications'));
         $this->assertFalse($order->isProcessedBy('inventory'));
@@ -114,7 +121,7 @@ class OrderTest extends TestCase
 
     public function testMarkProcessedByTracksHandler(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
 
         $order->markProcessedBy('notifications');
 
@@ -125,20 +132,19 @@ class OrderTest extends TestCase
 
     public function testMarkProcessedByIsIdempotent(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
 
         $order->markProcessedBy('notifications');
         $order->markProcessedBy('notifications');
         $order->markProcessedBy('notifications');
 
-        // Handler should appear only once in the list
         $this->assertSame(['notifications'], $order->getProcessedBy());
         $this->assertTrue($order->isProcessedBy('notifications'));
     }
 
     public function testMarkProcessedByMultipleHandlers(): void
     {
-        $order = new Order('test@example.com', [], 0.0);
+        $order = new Order('test@example.com', [], MoneyEmbeddable::ofUSD(100));
 
         $order->markProcessedBy('notifications');
         $order->markProcessedBy('inventory');
@@ -162,7 +168,7 @@ class OrderTest extends TestCase
             id: 'rec1234567890abcd',
             customerEmail: 'rec@example.com',
             items: ['x', 'y'],
-            total: 50.0,
+            total: MoneyEmbeddable::ofUSD(5000),
             status: 'processed',
             createdAt: $createdAt,
             processedBy: $processedBy,
@@ -178,12 +184,11 @@ class OrderTest extends TestCase
 
     public function testReconstructDefaultsToEmptyProcessedBy(): void
     {
-        // Backward compat: reconstruct() with no processedBy arg defaults to []
         $order = Order::reconstruct(
             id: 'def1234567890abcd',
             customerEmail: 'def@example.com',
             items: ['z'],
-            total: 10.0,
+            total: MoneyEmbeddable::ofUSD(1000),
             status: 'pending',
             createdAt: new \DateTimeImmutable(),
         );
@@ -191,19 +196,21 @@ class OrderTest extends TestCase
         $this->assertSame([], $order->getProcessedBy());
     }
 
-    public function testEmptyItemsAndZeroTotal(): void
+    public function testGetTotalReturnsMoneyEmbeddable(): void
     {
-        $order = new Order('minimal@test.com', [], 0.0);
+        $total = MoneyEmbeddable::ofUSD(4250);
+        $order = new Order('money@test.com', ['item'], $total);
 
-        $this->assertSame([], $order->getItems());
-        $this->assertSame(0.0, $order->getTotal());
-        $this->assertSame('pending', $order->getStatus());
+        $this->assertInstanceOf(MoneyEmbeddable::class, $order->getTotal());
+        $this->assertSame(4250, $order->getTotal()->getAmount());
+        $this->assertSame('USD', $order->getTotal()->getCurrency());
     }
 
-    public function testEmailWithSpecialCharacters(): void
+    public function testOrderWithMinimalAmount(): void
     {
-        $order = new Order('user+tag@sub.example.co.uk', [], 10.0);
+        $order = new Order('minimal@test.com', [], MoneyEmbeddable::ofUSD(1));
 
-        $this->assertSame('user+tag@sub.example.co.uk', $order->getCustomerEmail());
+        $this->assertSame(1, $order->getTotal()->getAmount());
+        $this->assertSame('pending', $order->getStatus());
     }
 }
