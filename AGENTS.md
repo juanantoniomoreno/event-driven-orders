@@ -86,3 +86,4 @@ docker compose up -d --build
 - ~~Race condition / no idempotency~~ → Phase 8.1 (Order.`processedBy` JSON column, each handler checks `isProcessedBy()` before doing work, retries are silently skipped)
 - ~~Handler code duplication~~ → Phase 8.2 (extracted Template Method into `AbstractOrderHandler`; each handler is now ~30 lines implementing 4 hooks)
 - ~~No validation / No DTOs / No error handling~~ → Phase 9.1 (typed `CreateOrderRequest` DTO with Symfony Validator; `OrderController::create()` returns structured field-level 400 errors; invalid JSON returns `{errors: {_body: ["Invalid JSON body"]}}`)
+- ~~Float for money~~ → Phase 9.2 (`moneyphp/money` integer cents + ISO 4217 currency via `MoneyEmbeddable` Doctrine Embeddable; BIGINT DB column; nested `MoneyInput` DTO; migration from DOUBLE PRECISION)
