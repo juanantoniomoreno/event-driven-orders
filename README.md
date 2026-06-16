@@ -20,9 +20,11 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 ├── backend/
 │   ├── src/
 │   │   ├── Controller/              # HTTP API (REST)
+│   │   ├── Dto/                     # Request DTOs (CreateOrderRequest, MoneyInput)
 │   │   ├── Domain/
 │   │   │   ├── Entity/             # Order (Doctrine ORM)
-│   │   │   └── Service/            # CreateOrderService, OrderRepositoryInterface, DoctrineOrderRepository
+│   │   │   ├── Service/            # CreateOrderService, OrderRepositoryInterface, DoctrineOrderRepository
+│   │   │   └── ValueObject/        # MoneyEmbeddable (Doctrine Embeddable)
 │   │   ├── Messaging/
 │   │   │   ├── Message/            # OrderCreatedMessage (DTO inmutable)
 │   │   │   └── Handler/            # AbstractOrderHandler + 3 handlers especializados
@@ -39,9 +41,9 @@ Proyecto de aprendizaje enfocado en **programación orientada a eventos**, **Doc
 │   ├── tests/e2e/                   # Playwright E2E tests
 │   ├── Dockerfile                    # Multi-stage (build + nginx)
 │   └── nginx.conf                   # Proxy a API + Mercure
-├── docker-compose.yml               # 8 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
+├── docker-compose.yml               # 9 servicios (nginx, php, postgres, rabbitmq, mercure, 3 workers, frontend)
 └── .github/workflows/
-    ├── ci.yml                       # Build, lint en PR/push
+    ├── ci.yml                       # Build, lint, PHPUnit, Playwright E2E en PR/push
     └── cd.yml                       # Deploy automático a VPS
 ```
 
@@ -121,7 +123,7 @@ docker logs -f edo_worker_analytics
 ```bash
 curl -X POST http://localhost:8080/api/orders \
   -H "Content-Type: application/json" \
-  -d '{"customerEmail":"test@example.com","items":["Pizza","Coke"],"total":25.50}'
+  -d '{"customerEmail":"test@example.com","items":["Pizza","Coke"],"total":{"amount":2550,"currency":"USD"}}'
 ```
 
 ## Roadmap de fases
@@ -175,15 +177,16 @@ Migración del transporte de Redis a RabbitMQ (AMQP). Workers consumen de colas 
 - ✅ 8.1 — Idempotencia en handlers (columna `processed_by` JSON en Order, cada handler registra su paso, retries se saltan)
 - ✅ 8.2 — Refactor DRY de handlers (Template Method: `AbstractOrderHandler`, 4 hooks por handler, ~30 líneas cada uno)
 
-### ✅ Fase 9: Validación y DTOs
+### ✅ Fase 9: Validación, DTOs y Money
 
 - ✅ 9.1 — DTO tipado para creación de órdenes (`CreateOrderRequest` con constraints Symfony Validator: `NotBlank`, `Email`, `NotNull`, `Count`, `GreaterThan`)
 - ✅ 9.1 — Validación de entrada en `OrderController::create()` con respuesta estructurada 400 campo por campo (`{errors: {customerEmail: ["..."], items: ["..."]}}`)
 - ✅ 9.1 — Manejo estructurado de errores: JSON inválido devuelve 400 con `{errors: {_body: ["Invalid JSON body"]}}`; violaciones de validación devuelven 400 con mensajes por campo
+- ✅ 9.2 — Value Object Money (`moneyphp/money` integer cents + ISO 4217 currency via `MoneyEmbeddable` Doctrine Embeddable; BIGINT DB column; nested `MoneyInput` DTO; migration from DOUBLE PRECISION)
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker. **Nota: no ejecuta phpunit**, solo build y lint.
+- **CI** (`.github/workflows/ci.yml`): Se ejecuta en cada push/PR. Valida build de backend, frontend y Docker. **Ejecuta PHPUnit** con SQLite in-memory y **Playwright E2E** contra el stack Docker completo.
 - **CD** (`.github/workflows/cd.yml`): Deploy automático a VPS via SSH cuando se mergea a `main`.
 
 Configurá estos secrets en tu repo:
@@ -192,11 +195,9 @@ Configurá estos secrets en tu repo:
 - `SSH_USER`
 - `SSH_HOST`
 
-## Deuda técnica conocida
+## Deuda técnica conocida (known limitation, won't fix)
 
-1. **`float $total` para dinero**: Causa problemas de precisión en coma flotante. Necesita un value object Money.
-2. **Condición de carrera en `processedBy`**: La columna JSON puede perder datos cuando múltiples handlers guardan concurrentemente (last write wins). La idempotencia individual funciona, pero `processedBy` no refleja todos los handlers que corrieron. Fix: optimistic locking o tabla `order_handler_status`.
-3. **CI sin tests**: El pipeline de CI solo hace build y lint, no ejecuta `phpunit`.
+1. **Condición de carrera en `processedBy`**: La columna JSON puede perder datos cuando múltiples handlers guardan concurrentemente (last write wins). La idempotencia individual funciona, pero `processedBy` no refleja todos los handlers que corrieron. **Impacto bajo**: solo afecta el registro de qué handler procesó la orden, no la funcionalidad. Fix posible: optimistic locking o tabla `order_handler_status`, pero no justifica la complejidad para un proyecto de aprendizaje.
 
 ---
 

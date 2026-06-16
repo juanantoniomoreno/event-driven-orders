@@ -20,3 +20,9 @@ backend/.env
 backend/.env.local
 backend/.env.*.local
 backend/vendor_old/
+
+# Playwright test artifacts
+frontend/test-results/
+
+# SDD artifacts (if using file-based mode)
+sdd/

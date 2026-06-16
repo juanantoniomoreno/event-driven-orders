@@ -26,19 +26,19 @@ Client → Nginx (8080) → PHP-FPM → Symfony Controller
                                       ↓
                                  CreateOrderService
                                       ↓
-                              OrderRepository (Doctrine/PostgreSQL)
+                               OrderRepository (Doctrine/PostgreSQL)
                                       ↓
-                          MessageBus → RabbitMQ (AMQP)
-                                          ↓
-                    ┌─────────────────────┼─────────────────────┐
-                    ↓                     ↓                     ↓
-          worker_notifications   worker_inventory    worker_analytics
-                    ↓                     ↓                     ↓
-                    └─────────────────────┼─────────────────────┘
-                                          ↓
-                                    Mercure Hub (3001)
-                                          ↓
-                                    Frontend (3000, SSE)
+                           MessageBus → RabbitMQ (AMQP)
+                                           ↓
+                     ┌─────────────────────┼─────────────────────┐
+                     ↓                     ↓                     ↓
+           worker_notifications   worker_inventory    worker_analytics
+                     ↓                     ↓                     ↓
+                     └─────────────────────┼─────────────────────┘
+                                           ↓
+                                     Mercure Hub (3001)
+                                           ↓
+                                     Frontend (3000, SSE)
 ```
 
 ## Directory Map
@@ -48,7 +48,7 @@ Client → Nginx (8080) → PHP-FPM → Symfony Controller
 | `backend/`            | Symfony API + workers        |
 | `frontend/`           | React SPA (minimal)          |
 | `.github/workflows/`  | CI/CD pipelines              |
-| `docker-compose.yml`  | Full infrastructure (8 services) |
+| `docker-compose.yml`  | Full infrastructure (9 services) |
 
 ## Docker Services
 
@@ -72,9 +72,9 @@ cd frontend && npm install && cd ..
 docker compose up -d --build
 ```
 
-## Known Technical Debt
+## Known Technical Debt (known limitation, won't fix)
 
-- **Lost update on concurrent handler saves**: The `processedBy` JSON column can lose data when multiple handlers save concurrently (last write wins). Each handler's individual idempotency still works on retry, but `processedBy` won't reliably reflect all handlers that ran. Fix: optimistic locking on the Order entity, or a separate `order_handler_status` table.
+- **Lost update on concurrent handler saves**: The `processedBy` JSON column can lose data when multiple handlers save concurrently (last write wins). Each handler's individual idempotency still works on retry, but `processedBy` won't reliably reflect all handlers that ran. **Low impact**: only affects logging of which handler processed the order, not functionality. Fix possible: optimistic locking on the Order entity, or a separate `order_handler_status` table, but complexity not justified for a learning project.
 
 ## Resolved
 

@@ -14,13 +14,16 @@ src/
 │   ├── OrderController.php
 │   └── MercureJwtController.php
 ├── Dto/               # Request DTOs with Symfony Validator constraints
-│   └── CreateOrderRequest.php
+│   ├── CreateOrderRequest.php
+│   └── MoneyInput.php
 ├── Domain/
 │   ├── Entity/        # Doctrine entities (Order)
-│   └── Service/       # Business logic + repository interface/implementations
-│       ├── CreateOrderService.php
-│       ├── OrderRepositoryInterface.php
-│       └── DoctrineOrderRepository.php
+│   ├── Service/       # Business logic + repository interface/implementations
+│   │   ├── CreateOrderService.php
+│   │   ├── OrderRepositoryInterface.php
+│   │   └── DoctrineOrderRepository.php
+│   └── ValueObject/   # Doctrine Embeddables
+│       └── MoneyEmbeddable.php
 ├── Messaging/
 │   ├── Message/       # Immutable message DTOs for Messenger
 │   │   └── OrderCreatedMessage.php
@@ -88,13 +91,13 @@ php bin/phpunit
 php bin/console cache:clear
 ```
 
-## Known Technical Debt
+## Known Technical Debt (known limitation, won't fix)
 
-- **Float for money**: `float $total` causes floating-point precision issues; needs a Money value object
-- **Race condition on `processedBy`**: JSON column can lose data under concurrent handler saves (last write wins). Individual idempotency works, but `processedBy` won't reliably reflect all handlers. Fix: optimistic locking or separate `order_handler_status` table.
+- **Race condition on `processedBy`**: JSON column can lose data under concurrent handler saves (last write wins). Individual idempotency works, but `processedBy` won't reliably reflect all handlers. **Low impact**: only affects logging of which handler processed the order, not functionality. Fix possible: optimistic locking or separate `order_handler_status` table, but complexity not justified for a learning project.
 
 ## Resolved
 
+- ~~Float for money~~ → Phase 9.2 (`moneyphp/money` integer cents + ISO 4217 currency via `MoneyEmbeddable` Doctrine Embeddable; BIGINT DB column; nested `MoneyInput` DTO; migration from DOUBLE PRECISION)
 - ~~No validation~~ → Phase 9.1 (Symfony Validator via `CreateOrderRequest` DTO)
 - ~~No DTOs~~ → Phase 9.1 (typed `CreateOrderRequest` with `NotBlank`, `Email`, `NotNull`, `Count`, `GreaterThan` constraints)
 - ~~No error handling~~ → Phase 9.1 (structured 400 responses with field-level errors; invalid JSON returns `{errors: {_body: ["Invalid JSON body"]}}`)
