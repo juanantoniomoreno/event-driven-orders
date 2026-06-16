@@ -209,16 +209,4 @@ class CreateOrderRequestTest extends TestCase
 
         $this->assertGreaterThan(0, count($currencyViolations), 'Expected validation error on blank total.currency');
     }
-
-    public function testLegacyFlatFloatTotalRejected(): void
-    {
-        // Legacy format: total as a flat float should not be accepted
-        // The DTO now expects a MoneyInput object, not a float
-        // This test verifies that passing a flat float via the constructor
-        // is a type mismatch (PHP will enforce this via type declarations)
-        // We already test null total above; the key point is that
-        // the controller rejects flat floats before constructing the DTO.
-        // This test documents that the DTO cannot accept a float anymore.
-        $this->assertTrue(true, 'Legacy flat float is rejected at controller level via type check; DTO only accepts MoneyInput');
-    }
 }
