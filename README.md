@@ -63,22 +63,30 @@ Esto es programación orientada a eventos: el controlador no sabe quién va a pr
 Las variables de entorno se cargan desde dos lugares:
 
 - **`.env`** en la raíz del proyecto — leído por Docker Compose. Contiene credenciales de backing services (RabbitMQ, PostgreSQL) y el secreto JWT de Mercure.
-- **`backend/.env`** — leído por Symfony. Contiene solo variables de Symfony (`APP_ENV`, `APP_SECRET`, `MERCURE_URL`, etc.).
+- **`backend/.env`** — leído por Symfony. Contiene variables de Symfony (`APP_ENV`, `APP_SECRET`, `MERCURE_URL`, etc.).
 
-Ambos archivos están en `.gitignore`. El repo incluye **`.env.example`** como plantilla pública con valores placeholder. En un entorno nuevo:
+Ambos archivos están en `.gitignore`. El repo incluye plantillas públicas con valores placeholder:
+
+- **`.env.example`** — variables de Docker Compose (Mercure JWT, RabbitMQ, PostgreSQL)
+- **`backend/.env.example`** — variables de Symfony (APP_SECRET, DATABASE_URL, etc.)
+
+En un entorno nuevo:
 
 ```bash
-# 1. Copiar la plantilla y editar con valores reales
+# 1. Copiar las plantillas y editar con valores reales
 cp .env.example .env
-# Generar un secreto JWT de 64 chars (256 bits mínimo, 512 bits recomendado):
-openssl rand -hex 32
-# Pegar el resultado en MERCURE_JWT_SECRET dentro de .env
+cp backend/.env.example backend/.env
 
-# 2. Para Symfony, los valores dev de `backend/.env` son suficientes
-# Si necesitás overrides locales, usá `backend/.env.local` (no se commitea)
+# 2. Generar secrets
+# JWT de Mercure (64 chars, 256 bits mínimo):
+openssl rand -hex 32
+# APP_SECRET de Symfony (64 chars):
+openssl rand -hex 32
+
+# 3. Pegar los resultados en los archivos .env correspondientes
 ```
 
-> En producción, las credenciales deben venir de un secrets manager (Docker Secrets, Vault, AWS Secrets Manager), nunca del `.env` commiteado.
+> En producción, las credenciales deben venir de un secrets manager (Docker Secrets, Vault, AWS Secrets Manager), nunca de archivos `.env`.
 
 ## Cómo levantarlo
 
